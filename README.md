@@ -151,7 +151,7 @@ You should grant the following user *Reporter* access:
 
 Next, you will have to clone the forked repository to your local machine. You can clone the repository using either HTTPS or SSH.
 Using SSH is more secure, but requires
-[uploading a public key to GitLab](https://docs.gitlab.com/ee/ssh/).
+[uploading a public key to GitLab](https://docs.gitlab.com/ee/user/ssh.html).
 HTTPS is less secure but simpler as it only requires you to enter your CS account username and password.
 If in doubt, HTTPS is sufficient.
 
