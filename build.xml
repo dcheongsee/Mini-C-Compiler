@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- SCC Ant build file
+     @description This file is a (mostly) generic ant build file for your SCC project.
+                  You might have to change the value of the attribute "name" inside
+                  the "project"-tag below. The value should the name of your project.
+
+		  You can import this build file into Eclipse or IntelliJ.
+                  In addition, you can use it directly from the commandline:
+		     $ ant build
+		  The above command will build your compiler. Ant will create
+	          and output your compiler in directory called "bin".
+                  After a successful build you can run your compiler by typing
+                     $ java -cp bin Main
+
+		  To clean "bin" simply type
+		     $ ant clean
+		  on the commandline.		     
+		  -->
+<!-- Replace the value of the attribute "name" with the name of YOUR project. -->
+<project basedir="." default="build" name="comp520-coursework-w2025">
+  <!-- You do not need to touch anything below this comment -->
+  <property name="src" location="src/java"/>
+  <property name="bin" location="bin"/>
+  <property environment="env"/>
+  <property name="debuglevel" value="source,lines,vars"/>
+  <property name="target" value="21"/>
+  <property name="source" value="21"/>
+
+  <target name="init">
+    <tstamp/>
+    <mkdir dir="${bin}"/>
+    <copy includeemptydirs="false" todir="${bin}">
+      <fileset dir="${src}">
+        <exclude name="**/*.launch"/>
+        <exclude name="**/*.java"/>
+	<exclude name="**/*.class"/>
+      </fileset>
+    </copy>
+  </target>
+  <target name="clean">
+    <delete dir="${bin}"/>
+  </target>
+  <target depends="clean" name="cleanall"/>
+  <target depends="build-subprojects,build-project" name="build"/>
+  <target name="build-subprojects"/>
+  <target depends="init" name="build-project">
+    <echo message="${ant.project.name}: ${ant.file}"/>
+    <javac debug="true" excludes="test/**" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false" source="${source}" target="${target}">
+      <src path="src"/>
+    </javac>
+  </target>
+  <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
+  <target name="Main1">
+    <java classname="Main1" failonerror="true" fork="yes" classpath="${bin}">
+      <arg line="-parser tests/fibonacci.c"/>
+    </java>
+  </target>
+</project>

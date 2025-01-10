@@ -1,0 +1,7 @@
+This folders contains a few tests to get you started.
+The file minic-stdlib.h is only included so that you can compile these tests using your existing local compiler (e.g. GCC, MSVC).
+Note that this header file should be completely ignored by your own compiler.
+
+For instance, you can compile the fibonacci program on Linux by typing:
+
+gcc fibonacci.c -o fibonacci
