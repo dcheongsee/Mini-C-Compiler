@@ -1,5 +1,7 @@
 int main() {
-    int x = 10;
-    int x = 20; // duplicate var declaration
+    int x;
+    int x;  // duplicate var declaration
+    x = 10;
+    x = 20;
     return x;
 }

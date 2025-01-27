@@ -1,5 +1,7 @@
 int main() {
-    int a, b, c;
-    a = b = c = 10; // chained assignment
+    int a;
+    int b;
+    int c;
+    a = b = c = 10;
     return a + b + c;
 }

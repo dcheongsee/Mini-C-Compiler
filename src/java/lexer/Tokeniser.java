@@ -161,6 +161,9 @@ public class Tokeniser extends CompilerPass {
                         } else {
                             error(escapeChar, scanner.getLine(), scanner.getColumn());
                             valid = false;
+                            while (scanner.hasNext() && scanner.peek() != '\'') {
+                                scanner.next();
+                            }
                         }
                     } else {
                         error(nextChar, scanner.getLine(), scanner.getColumn());
@@ -170,14 +173,24 @@ public class Tokeniser extends CompilerPass {
                     sb.append(nextChar);
                 }
 
-                if (!scanner.hasNext() || scanner.next() != '\'') {
+                if (scanner.hasNext()) {  // check for closing '
+                    char closingQuote = scanner.next();
+                    if (closingQuote != '\'') {
+                        if (valid) {
+                            error(c, startLine, startCol);
+                            valid = false;
+                        }
+                    }
+                } else {
                     error(c, startLine, startCol);
                     valid = false;
                 }
 
-                if (sb.length() != 1 && (sb.length() != 2 || sb.charAt(0) != '\\')) { // must be single character
-                    error(c, startLine, startCol);
-                    valid = false;
+                if (valid) {
+                    if (sb.length() != 1 && (sb.length() != 2 || sb.charAt(0) != '\\')) {
+                        error(c, startLine, startCol);
+                        valid = false;
+                    }
                 }
 
                 if (valid) {
@@ -196,6 +209,10 @@ public class Tokeniser extends CompilerPass {
                 while (scanner.hasNext()) {
                     char nextChar = scanner.next();
                     if (nextChar == '\\') {
+                        if (scanner.hasNext() && scanner.peek() == '\n') {  // escaped newline
+                            scanner.next();
+                            continue;
+                        }
                         if (scanner.hasNext()) {
                             char escapeChar = scanner.next();
                             if (isValidEscape(escapeChar)) {

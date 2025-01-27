@@ -314,7 +314,7 @@ public class Parser extends CompilerPass {
     private void parseEquality() {
         parseRelational();
         while (accept(Category.EQ, Category.NE)) {
-            expect();
+            expect(Category.EQ, Category.NE);
             parseRelational();
         }
     }
@@ -322,7 +322,7 @@ public class Parser extends CompilerPass {
     private void parseRelational() {
         parseAdditive();
         while (accept(Category.LT, Category.GT, Category.LE, Category.GE)) {
-            expect();
+            expect(Category.LT, Category.GT, Category.LE, Category.GE);
             parseAdditive();
         }
     }
@@ -330,7 +330,7 @@ public class Parser extends CompilerPass {
     private void parseAdditive() {
         parseMultiplicative();
         while (accept(Category.PLUS, Category.MINUS)) {
-            expect();
+            expect(Category.PLUS, Category.MINUS);
             parseMultiplicative();
         }
     }
@@ -338,14 +338,14 @@ public class Parser extends CompilerPass {
     private void parseMultiplicative() {
         parseUnary();
         while (accept(Category.ASTERISK, Category.DIV, Category.REM)) {
-            expect();
+            expect(Category.ASTERISK, Category.DIV, Category.REM);
             parseUnary();
         }
     }
 
     private void parseUnary() {
         if (accept(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND, Category.SIZEOF)) {
-            expect();
+            expect(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND, Category.SIZEOF);
             parseUnary();
         } else if (accept(Category.LPAR)) {
             if (isType(lookAhead(1).category)) {

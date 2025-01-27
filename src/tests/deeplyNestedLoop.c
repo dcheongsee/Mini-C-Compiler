@@ -1,12 +1,12 @@
 int main() {
-    for (int i = 0; i < 5; i++) {
-        for (int j = 0; j < 5; j++) {
-            for (int k = 0; k < 5; k++) {
-                for (int l = 0; l < 5; l++) {
-                    print_i(i + j + k + l);
-                }
-            }
+    int i;
+    i = 0;
+    while (i < 5) {
+        int j;
+        j = 0;
+        while (j < 5) { // nested loops
         }
+        i = i + 1;  // valid under grammar’s exp = exp rule
     }
     return 0;
 }

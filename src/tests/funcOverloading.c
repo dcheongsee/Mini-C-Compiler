@@ -1,4 +1,4 @@
-// mini-C doesn't support overloading; this checks for errors
+// syntactically should pass parsing but semantically wrong(later stage of compiler)
 int add(int a, int b) {
     return a + b;
 }
