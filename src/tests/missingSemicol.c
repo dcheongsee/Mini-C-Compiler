@@ -1,4 +1,5 @@
 int main() {
-    int x = 10 // missing semicolon
+    int x;
+    x = 10 // missing semicolon
     return x;
 }

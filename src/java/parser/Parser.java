@@ -344,8 +344,10 @@ public class Parser extends CompilerPass {
     }
 
     private void parseUnary() {
-        if (accept(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND, Category.SIZEOF)) {
-            expect(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND, Category.SIZEOF);
+        if (accept(Category.SIZEOF)) {
+            parseSizeOf();
+        } else if (accept(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND)) {
+            expect(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND);
             parseUnary();
         } else if (accept(Category.LPAR)) {
             if (isType(lookAhead(1).category)) {
@@ -379,11 +381,16 @@ public class Parser extends CompilerPass {
             Token ident = expect(Category.IDENTIFIER);
             if (accept(Category.LPAR)) parseFuncall(ident);
             else if (accept(Category.LSBR)) parseArrayAccess(ident);
-            else if (accept(Category.DOT)) parseFieldAccess(ident);
+            else if (accept(Category.DOT)) parseFieldAccess();
         } else if (accept(Category.INT_LITERAL, Category.CHAR_LITERAL, Category.STRING_LITERAL)) {
             expect(Category.INT_LITERAL, Category.CHAR_LITERAL, Category.STRING_LITERAL);
         }   else {
             error(Category.IDENTIFIER, Category.INT_LITERAL, Category.CHAR_LITERAL, Category.STRING_LITERAL, Category.LPAR);
+        }
+
+        // after parsing any primary check for field accesses
+        while (accept(Category.DOT)) {
+            parseFieldAccess();
         }
     }
 
@@ -410,8 +417,19 @@ public class Parser extends CompilerPass {
         }
     }
 
-    private void parseFieldAccess(Token ident) {
+    private void parseFieldAccess() {
         expect(Category.DOT);
         expect(Category.IDENTIFIER);
+        while (accept(Category.DOT)) { // nested field access
+            expect(Category.DOT);
+            expect(Category.IDENTIFIER);
+        }
+    }
+
+    private void parseSizeOf() {
+        expect(Category.SIZEOF);
+        expect(Category.LPAR);
+        parseType();  // Parse the type inside sizeof()
+        expect(Category.RPAR);
     }
 }
