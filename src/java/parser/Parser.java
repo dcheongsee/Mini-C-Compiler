@@ -380,7 +380,7 @@ public class Parser extends CompilerPass {
         } else if (accept(Category.IDENTIFIER)) {
             Token ident = expect(Category.IDENTIFIER);
             if (accept(Category.LPAR)) parseFuncall(ident);
-            else if (accept(Category.LSBR)) parseArrayAccess(ident);
+            else if (accept(Category.LSBR)) parseArrayAccess();
             else if (accept(Category.DOT)) parseFieldAccess();
         } else if (accept(Category.INT_LITERAL, Category.CHAR_LITERAL, Category.STRING_LITERAL)) {
             expect(Category.INT_LITERAL, Category.CHAR_LITERAL, Category.STRING_LITERAL);
@@ -391,6 +391,10 @@ public class Parser extends CompilerPass {
         // after parsing any primary check for field accesses
         while (accept(Category.DOT)) {
             parseFieldAccess();
+        }
+        // after field accesses check for array accesses
+        while (accept(Category.LSBR)) {
+            parseArrayAccess();
         }
     }
 
@@ -406,7 +410,7 @@ public class Parser extends CompilerPass {
         expect(Category.RPAR);
     }
 
-    private void parseArrayAccess(Token ident) {
+    private void parseArrayAccess() {
         expect(Category.LSBR);
         parseExp();
         expect(Category.RSBR);
