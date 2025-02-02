@@ -17,14 +17,25 @@ public class ASTPrinter {
 
         switch(node) {
 
+            case FunDef fd -> {
+                visit(fd.type);
+                writer.print(","+fd.name);
+                for (VarDecl vd : fd.params) {
+                    writer.print(",");
+                    visit(vd);
+
+                }
+                writer.print(",");
+                visit(fd.block);
+            }
+
             case FunDecl fd -> {
                 visit(fd.type);
-                writer.print(","+fd.name+",");
+                writer.print(","+fd.name);
                 for (VarDecl vd : fd.params) {
-                    visit(vd);
                     writer.print(",");
+                    visit(vd);
                 }
-                visit(fd.block);
             }
 
             case VarDecl vd -> {
