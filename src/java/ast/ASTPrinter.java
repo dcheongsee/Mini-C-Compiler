@@ -47,7 +47,22 @@ public class ASTPrinter {
                 writer.print(v.name);
             }
 
-            // to complete ...
+            // print block’s var decl and stmts
+            case Block b -> {
+                String delimiter = "";
+                // first print variable decl
+                for (VarDecl vd : b.vds) {
+                    writer.print(delimiter);
+                    visit(vd);
+                    delimiter = ",";
+                }
+                // then print stmts
+                for (Stmt s : b.stmts) {
+                    writer.print(delimiter);
+                    visit(s);
+                    delimiter = ",";
+                }
+            }
 
             default -> {
                 String delimiter = "";
