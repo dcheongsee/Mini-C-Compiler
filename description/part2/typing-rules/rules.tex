@@ -1,0 +1,162 @@
+\documentclass[a4paper]{article}
+
+
+\usepackage[margin=2cm]{geometry}
+
+\usepackage{mathpartir}
+\usepackage{amssymb}
+
+\title{\vspace{-2ex}Typing rules for MiniC\vspace{-2ex}}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}  % removes page number
+ 
+
+ 
+  
+\section{Declarations}
+ 
+ 
+\begin{mathpar}
+\inferrule*[left=VarDecl(\textup{v:\textbf{T}})]{
+\textbf{T} \notin \{\textbf{void}\}
+}{add\ \langle v : \textbf{T}\rangle\ to\ \Gamma}
+\end{mathpar}
+
+\begin{mathpar}
+    \inferrule*[left=FunDecl(\textup{f})]{\ }{add\ \langle f: (U_1, \ldots, U_n) \rightarrow \textbf{T} \rangle\ to\ \Gamma}
+\and
+\inferrule*[left=FunDef(\textup{f})]{\ }{add\ \langle f: (U_1, \ldots, U_n) \rightarrow \textbf{T} \rangle\ to\ \Gamma}
+\end{mathpar}
+
+
+\section{Expressions}
+
+% Literals
+\begin{mathpar}
+\inferrule*[left=IntLiteral(\textup{i})]{\ }{\Gamma \vdash i : \textbf{int}}
+\and
+\inferrule*[left=StrLiteral(\textup{s})]{\ }{\Gamma \vdash s : \textbf{char[s.length+1]}}
+\and
+\inferrule*[left=ChrLiteral(\textup{c})]{\ }{\Gamma \vdash c : \textbf{char}}
+\end{mathpar}
+
+% VarExpr
+\begin{mathpar}
+  \inferrule*[left=VarExpr(\textup{v})]{\vdash \langle v : \textbf{T}\rangle \in \Gamma}{\Gamma \vdash v : \textbf{T}}
+\end{mathpar}
+
+% FunCallExpr
+%% \begin{mathpar}
+%% \inferrule*[left=FunCallExpr(\textup{f})]{
+%% %
+%% \vdash \langle f: \overline{U} \rightarrow \textbf{T} \rangle \in \Gamma
+%% \and
+%% \Gamma \vdash \overline{Var} : \overline{U}
+%% %
+%% }{\Gamma \vdash f(\overline{Var}) : \textbf{T}}
+%% \end{mathpar}
+\begin{mathpar}
+\inferrule*[left=FunCall(\textup{f})]{
+%
+\Gamma \vdash f: (U_1, \ldots, U_n) \rightarrow \textbf{T}
+\and
+\Gamma \vdash x_1 : U_1
+\and
+\ldots
+\and
+\Gamma \vdash x_n : U_n
+%
+}{\Gamma \vdash f(x_1, \ldots, x_n) : \textbf{T}}
+\end{mathpar}
+
+
+
+% int BinOp
+ \begin{mathpar}
+\inferrule*[left={BinOp(\textup{e1,e2},Op=\{ADD,SUB,MUL,DIV,MOD,OR,AND,GT,LT,GE,LE\})}]{\Gamma \vdash e_1 : \textbf{int} \\ \vdash e_2 : \textbf{int}}{\Gamma \vdash e_1 Op\ e_2 : \textbf{int}}
+\end{mathpar}
+
+% other BinOp
+ \begin{mathpar}
+\inferrule*[left={BinOp(\textup{e1,e2},Op=\{NE,EQ\})}]{\Gamma \vdash e_1 : \textbf{T} \notin \{\textbf{StructType, ArrayType, void}\} \\ \vdash e_2 : \textbf{T}}{\Gamma \vdash e_1\ Op\ e_2 : \textbf{int}}
+\end{mathpar}
+
+
+% ArrayAccessExpr
+\begin{mathpar}
+\inferrule*[left={ArrayAccessExpr(\textup{e1,e2})}]{\Gamma \vdash e_1 : \textbf{T} \in \{\textbf{ArrrayType}_{\textbf{elemType}},\textbf{PointerType}_{\textbf{elemType}}\} \\ \vdash e_2 : \textbf{int}}{\Gamma \vdash e_1[e_2] : \textbf{elemType} }
+\end{mathpar}
+
+% \begin{mathpar}
+% \inferrule*[left={ArrayAccessExpr}]{\Gamma \vdash Expr_1 : \textbf{AT} \in \{ArrrayType_elemType,PointerType_elemType} \\ \vdash Expr_2 : \textbf{int}}{\Gamma \vdash Expr_1[Expr_2] : \textbf{elemType} }
+% \end{mathpar}
+
+% FieldAccessExpr
+\begin{mathpar}
+\inferrule*[left={FieldAccessExpr(\textup{e,fieldName})}]{\Gamma \vdash e : \textbf{StructType}_{fieldName : \textbf{T}}}{\Gamma \vdash e.fieldName : \textbf{T} }
+\end{mathpar}
+
+% ValueAtExpr
+\begin{mathpar}
+\inferrule*[left={ValueAtExpr(\textup{e})}]{\Gamma \vdash e : \textbf{PointerType}_\textbf{T}}{\Gamma \vdash *e : \textbf{T} }
+\end{mathpar}
+
+% AddressOfExpr
+\begin{mathpar}
+\inferrule*[left={AddressOfExpr(\textup{e})}]{\Gamma \vdash e : \textbf{T}}{\Gamma \vdash \&e : \textbf{PointerType}_\textbf{T} }
+\end{mathpar}
+
+
+% SizeOfExpr
+\begin{mathpar}
+\inferrule*[left={SizeOf(\textup{t})}]{\ }{\Gamma \vdash \ sizeof(t) : \textbf{int} }
+\end{mathpar}
+
+% TypeCastExpr
+\begin{mathpar}
+\inferrule*[left={TypeCastExpr(char to int)}]{\Gamma \vdash e : \textbf{char}}{\Gamma \vdash \ (\textbf{int})e : \textbf{int} }
+\end{mathpar}
+
+
+\begin{mathpar}
+\inferrule*[left={TypeCastExpr(array to pointer)}]{\Gamma \vdash e : \textbf{ArrayType}_\textbf{elemType}}{\Gamma \vdash \ (\textbf{*elemType})e : \textbf{PointerType}_\textbf{elemType} }
+\end{mathpar}
+
+\begin{mathpar}
+\inferrule*[left={TypeCastExpr(pointer to pointer)}]{\Gamma \vdash e : \textbf{PointerType}_\textbf{elemType1}}{\Gamma \vdash \ (\textbf{*elemType2})e : \textbf{PointerType}_\textbf{elemType2} }
+\end{mathpar}
+
+% Assignment
+\begin{mathpar}
+  \inferrule*[left=Assign]{\Gamma \vdash e_1 : \textbf{T} \notin \{\textbf{void, ArrayType}\} \\ \Gamma \vdash e_2 : \textbf{T}}{\Gamma \vdash e_1 = e_2 : \textbf{T}}
+\end{mathpar}
+
+
+
+\section{Statements}
+
+
+\begin{mathpar}
+\inferrule*[left={While}]{\Gamma \vdash e : \textbf{int}}{\Gamma \vdash while(e)\ s}
+\end{mathpar}
+
+\begin{mathpar}
+\inferrule*[left={If(no else)}]{\Gamma \vdash e : \textbf{int}}{\Gamma \vdash if(e)\ s}
+\and
+\inferrule*[left={If(with else)}]{\Gamma \vdash e : \textbf{int}}{\Gamma \vdash if(e)\ s_1\ else\ s_2}
+\end{mathpar}
+
+
+
+\begin{mathpar}
+\inferrule*[left=Return(from \textup{f})]{\Gamma \vdash f: (U_1, \ldots, U_n) \rightarrow \textbf{T} \\ \Gamma \vdash e : \textbf{T}}{\Gamma \vdash return\ e}
+\end{mathpar}
+
+\begin{mathpar}
+\inferrule*[left=Return(nothing from \textup{f})]{\Gamma \vdash f: (U_1, \ldots, U_n) \rightarrow \textbf{void}}{\Gamma \vdash return\ \varnothing}
+\end{mathpar}
+ 
+\end{document}

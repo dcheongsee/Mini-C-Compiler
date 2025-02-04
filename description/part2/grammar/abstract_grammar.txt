@@ -1,0 +1,89 @@
+// The program top AST node (a list of declarations)
+Program    ::= (Decl)*
+
+// Declarations/definitions
+Decl       ::= StructTypeDecl | VarDecl | FunDecl | FunDef
+
+// Types
+Type        ::= BaseType | PointerType | StructType | ArrayType
+
+BaseType    ::= INT | CHAR | VOID | NONE | UNKNOWN  // NONE should be used mostly for statements and UNKNOWN in case where no type can be inferred
+PoInterType ::= Type              // use to represent pointers to other types
+StructType  ::= String            // represents a struct type (the String is the name of the declared struct type)
+ArrayType   ::= Type Int          // Type represents the element type, Int represents the number of elements in the declared array
+
+// Struct declaration
+StructTypeDecl ::= StructType VarDecl*
+
+// Variable declaration
+VarDecl    ::= Type String
+
+// FunDecl definition (the String is the name of the FunDecl)
+FunDef     ::= Type String VarDecl* Block
+
+// Function prototype (the String is the name of the function)
+FunDecl    ::= Type String VarDecl*
+
+// Expressions
+Expr       ::= IntLiteral | StrLiteral | ChrLiteral | VarExpr | FunCallExpr | BinOp | ArrayAccessExpr | FieldAccessExpr | ValueAtExpr | AddressOfExpr | SizeOfExpr | TypecastExpr | Assign
+
+// Literals
+IntLiteral ::= Int     // Int stores the value of the Integer
+StrLiteral ::= String  // String stores the value of the String
+ChrLiteral ::= Char    // char stores the value of the Character
+
+// Variable (the String is the name of the variable)
+VarExpr     ::= String
+
+// Function call (the String corresponds to the name of the function to call and the Expr* is the list of arguments)
+FunCallExpr ::= String Expr*
+
+// Binary operations
+BinOp      ::= Expr Op Expr
+Op         ::= ADD | SUB | MUL | DIV | MOD | GT | LT | GE | LE | NE | EQ | OR | AND
+
+// Array access expression : Expr[Expr] (e.g. a[10])
+ArrayAccessExpr ::= Expr Expr // the first Expr is the array, the second one the index
+
+// Field access expression : Expr.String (e.g. *a.b)
+FieldAccessExpr ::= Expr String // the Expr represents the structure, the String represents the name of the field
+
+// Value at expression : *Expr (e.g. *p)
+ValueAtExpr ::= Expr
+
+// Address of an expression: &Expr (e.g. &(a[i]))
+AddressOfExpr ::= Expr
+
+// Sizeof expression : sizeof(Type) (e.g. sizeof(int*))
+SizeOfExpr   ::= Type
+
+// Typecast expression : (Type)Expr (e.g. (int*) malloc(4))
+TypecastExpr ::= Type Expr
+
+// Assignment epxression: Expr = Expr; (e.g. x[3] = 2)
+Assign       ::= Expr Expr
+
+
+// Statements
+Stmt       ::= Block | While | If | Return | Continue | Break | ExprStmt
+
+// An expression statement (e.g. x+2;)
+ExprStmt ::= Expr
+
+// While loop statement : while (Expr) Stmt;
+While      ::= Expr Stmt
+
+// If statement: if (Expr) Stmt1 else Stmt2; (if the second Stmt is null, this means there is no else part)
+If         ::= Expr Stmt [Stmt]
+
+// Return statement : (the Expr is optional)
+Return     ::= [Expr]
+
+// Continue statement (nothing stored)
+Continue   ::=
+
+// Break statement (nothing stored)
+Break      ::=
+
+// Block statement (starts with { and end with } in the source code)
+Block      ::= VarDecl* Stmt*

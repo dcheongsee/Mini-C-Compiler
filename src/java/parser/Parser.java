@@ -1,12 +1,19 @@
 package parser;
 
-
+import ast.Type;
+import ast.BaseType;
+import ast.Decl;
+import ast.VarDecl;
+import ast.Program;
+import ast.StructTypeDecl;
 import lexer.Token;
 import lexer.Token.Category;
 import lexer.Tokeniser;
 import util.CompilerPass;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 
 
@@ -17,7 +24,7 @@ public class Parser extends CompilerPass {
 
     private Token token;
 
-    private final Queue<Token> buffer = new LinkedList<>();
+    private Queue<Token> buffer = new LinkedList<>();
 
     private final Tokeniser tokeniser;
 
@@ -27,10 +34,11 @@ public class Parser extends CompilerPass {
         this.tokeniser = tokeniser;
     }
 
-    public void parse() {
+    public Program parse() {
         // get the first token
         nextToken();
-        parseProgram();
+
+        return parseProgram();
     }
 
 
@@ -117,15 +125,18 @@ public class Parser extends CompilerPass {
     }
 
 
-    private void parseProgram() {
+    private Program parseProgram() {
         parseIncludes();
+        List<Decl> decls = new ArrayList<>();  // added from instructor's version
+
         while (accept(Category.STRUCT, Category.INT, Category.CHAR, Category.VOID)) {
             if (token.category == Category.STRUCT &&
                     lookAhead(1).category == Category.IDENTIFIER &&
                     lookAhead(2).category == Category.LBRA) {
-                parseStructDecl();
+                decls.add(parseStructDecl());
             }
             else {
+                // Use your existing logic to handle function and variable declarations.
                 parseType();
                 Token ident = expect(Category.IDENTIFIER);
                 if (accept(Category.LPAR)) {
@@ -136,6 +147,7 @@ public class Parser extends CompilerPass {
             }
         }
         expect(Category.EOF);
+        return new Program(decls);
     }
 
     // includes are ignored, so does not need to return an AST node
@@ -147,15 +159,19 @@ public class Parser extends CompilerPass {
         }
     }
 
-    private void parseStructDecl() {
+    private StructTypeDecl parseStructDecl() {
         expect(Category.STRUCT);
-        expect(Category.IDENTIFIER);
+        Token id = expect(Category.IDENTIFIER);
         expect(Category.LBRA);
+        List<Decl> fields = new ArrayList<>();
+
         do {
-            parseVariableDecl();
+            fields.add(parseVariableDecl());
         } while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT));
         expect(Category.RBRA);
         expect(Category.SC);
+
+        return new StructTypeDecl(id.data, fields);
     }
 
     private void parseFunction(Token ident) {
@@ -169,11 +185,13 @@ public class Parser extends CompilerPass {
         }
     }
 
-    private void parseVariableDecl() {
-        parseType();
-        expect(Category.IDENTIFIER);
+    // *new*,  returns a declaration AST node for a var
+    private Decl parseVariableDecl() {
+        Type type = parseType();
+        Token ident = expect(Category.IDENTIFIER);
         parseArrayDimensions();
         expect(Category.SC);
+        return new VarDecl(type, ident.data);
     }
 
     // those that appear after type and identifier
@@ -209,14 +227,36 @@ public class Parser extends CompilerPass {
         parseArrayDimensions();
     }
 
-    private void parseType() {
+    private Type parseType() {
+        Type type;
         if (accept(Category.STRUCT)) {
             expect(Category.STRUCT);
-            expect(Category.IDENTIFIER);
+            Token id = expect(Category.IDENTIFIER);
+
+            type = BaseType.UNKNOWN;
         } else {
-            expect(Category.INT, Category.CHAR, Category.VOID);
+            // expect one of INT, CHAR, VOID
+            Token t = expect(Category.INT, Category.CHAR, Category.VOID);
+            switch (t.category) {
+                case INT:
+                    type = BaseType.INT;
+                    break;
+                case CHAR:
+                    type = BaseType.CHAR;
+                    break;
+                case VOID:
+                    type = BaseType.VOID;
+                    break;
+                default:
+                    type = BaseType.UNKNOWN;
+                    break;
+            }
         }
-        while (accept(Category.ASTERISK)) expect(Category.ASTERISK);
+        while (accept(Category.ASTERISK)) {
+            expect(Category.ASTERISK);
+
+        }
+        return type;
     }
 
     private void parseBlock() {
