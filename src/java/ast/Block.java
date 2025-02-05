@@ -28,19 +28,4 @@ public final class Block extends Stmt {
         return children;
     }
 
-    // helper to add a vd
-    public void addVarDecl(VarDecl vd) {
-        vds.add(vd);
-    }
-
-    // helper to add a stmt
-    public void addStmt(Stmt stmt) {
-        stmts.add(stmt);
-    }
-
-    @Override
-    public String toString() {
-        return "Block(" + vds.toString() + "," + stmts.toString() + ")";
-    }
-
 }

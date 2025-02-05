@@ -3,18 +3,17 @@ package ast;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class Return extends Stmt {
-    public final Expr expr; // can be null if there is no return expr
+public final class AddressOfExpr extends Expr {
+    public final Expr expr;
 
-    public Return(Expr expr) {
+    public AddressOfExpr(Expr expr) {
         this.expr = expr;
     }
 
     @Override
     public List<ASTNode> children() {
         List<ASTNode> children = new ArrayList<>();
-        if (expr != null)
-            children.add(expr);
+        children.add(expr);
         return children;
     }
 }

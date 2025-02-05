@@ -1,33 +1,35 @@
 package sem;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Stream;
 
 public class Scope {
 	private Scope outer;
 	private Map<String, Symbol> symbolTable;
-	
-	public Scope(Scope outer) { 
-		this.outer = outer; 
+
+	public Scope(Scope outer) {
+		this.outer = outer;
+		this.symbolTable = new HashMap<>();
 	}
-	
-	public Scope() { this(null); }
+
+	public Scope() {
+		this(null);
+	}
 
 	public Symbol lookup(String name) {
-		// stream to iterate over scope chain
-		return Stream.iterate(this, s -> s.outer)
-				.filter(Objects::nonNull)
-				.map(s -> s.symbolTable.get(name))
-				.filter(Objects::nonNull)
-				.findFirst()
-				.orElse(null);
+		Symbol sym = symbolTable.get(name);
+		if (sym != null) {
+			return sym;
+		} else if (outer != null) {
+			return outer.lookup(name);
+		}
+		return null;
 	}
 
 	public Symbol lookupCurrent(String name) {
 		return symbolTable.get(name);
 	}
-	
+
 	public void put(Symbol sym) {
 		symbolTable.put(sym.name, sym);
 	}

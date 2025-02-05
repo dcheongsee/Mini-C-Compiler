@@ -3,27 +3,20 @@ package ast;
 import java.util.ArrayList;
 import java.util.List;
 
-
-// assignment expr i.e Expr = Expr
 public final class Assign extends Expr {
-    public final Expr lhs;
-    public final Expr rhs;
+    public final Expr left;
+    public final Expr right;
 
-    public Assign(Expr lhs, Expr rhs) {
-        this.lhs = lhs;
-        this.rhs = rhs;
+    public Assign(Expr left, Expr right) {
+        this.left = left;
+        this.right = right;
     }
 
     @Override
     public List<ASTNode> children() {
         List<ASTNode> children = new ArrayList<>();
-        children.add(lhs);
-        children.add(rhs);
+        children.add(left);
+        children.add(right);
         return children;
-    }
-
-    @Override
-    public String toString() {
-        return "Assign(" + lhs + ", " + rhs + ")";
     }
 }

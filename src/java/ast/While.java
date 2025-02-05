@@ -3,27 +3,20 @@ package ast;
 import java.util.ArrayList;
 import java.util.List;
 
-
-// while loop i.e while (Expr) Stmt
 public final class While extends Stmt {
-    public final Expr cond;
-    public final Stmt body;
+    public final Expr expr;  // loop condition
+    public final Stmt stmt;  // body of loop
 
-    public While(Expr cond, Stmt body) {
-        this.cond = cond;
-        this.body = body;
+    public While(Expr expr, Stmt stmt) {
+        this.expr = expr;
+        this.stmt = stmt;
     }
 
     @Override
     public List<ASTNode> children() {
         List<ASTNode> children = new ArrayList<>();
-        children.add(cond);
-        children.add(body);
+        children.add(expr);
+        children.add(stmt);
         return children;
-    }
-
-    @Override
-    public String toString() {
-        return "While(" + cond + ", " + body + ")";
     }
 }

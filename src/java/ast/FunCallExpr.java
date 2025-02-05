@@ -19,8 +19,4 @@ public final class FunCallExpr extends Expr {
         return new ArrayList<>(args);
     }
 
-    @Override
-    public String toString() {
-        return "FunCallExpr(" + name + ", " + args + ")";
-    }
 }

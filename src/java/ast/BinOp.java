@@ -24,8 +24,4 @@ public final class BinOp extends Expr {
         return children;
     }
 
-    @Override
-    public String toString() {
-        return "BinOp(" + left + ", " + op + ", " + right + ")";
-    }
 }

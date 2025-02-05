@@ -17,8 +17,4 @@ public final class ChrLiteral extends Expr {
         return new ArrayList<>();
     }
 
-    @Override
-    public String toString() {
-        return "ChrLiteral(" + value + ")";
-    }
 }

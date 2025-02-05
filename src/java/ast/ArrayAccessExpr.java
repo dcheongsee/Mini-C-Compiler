@@ -22,8 +22,4 @@ public final class ArrayAccessExpr extends Expr {
         return children;
     }
 
-    @Override
-    public String toString() {
-        return "ArrayAccessExpr(" + array + ", " + index + ")";
-    }
 }

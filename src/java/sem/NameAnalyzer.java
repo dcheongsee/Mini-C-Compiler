@@ -2,140 +2,148 @@ package sem;
 
 import ast.*;
 
-
 public class NameAnalyzer extends BaseSemanticAnalyzer {
-	private Scope currentScope;
 
-	private static class VarSymbol extends Symbol {
-		public final VarDecl decl;
-		public VarSymbol(String name, VarDecl decl) {
-			super(name);
-			this.decl = decl;
-		}
-	}
-
-	private static class FunSymbol extends Symbol {
-		public final Decl decl;
-		public FunSymbol(String name, Decl decl) {
-			super(name);
-			this.decl = decl;
-		}
-	}
+	private Scope currentScope = new Scope();
 
 	public void visit(ASTNode node) {
-		switch(node) {
+		switch (node) {
 			case null -> {
 				throw new IllegalStateException("Unexpected null value");
 			}
 
 			case Block b -> {
-				Scope saved = currentScope;
-				currentScope = new Scope(currentScope);
-
-				for (VarDecl vd : b.vds) {     // process var decl
-					visit(vd);
+				// create new inner scope for block
+				Scope previous = currentScope;
+				currentScope = new Scope(previous);
+				for (ASTNode child : b.children()) {
+					visit(child);
 				}
-
-				for (Stmt s : b.stmts) {     // process stmts
-					visit(s);
-				}
-
-				currentScope = saved;
+				currentScope = previous;
 			}
 
 			case FunDecl fd -> {
-				// check duplicate func decl
+				// check duplicate func decl in current scope
 				if (currentScope.lookupCurrent(fd.name) != null) {
-					error("Function " + fd.name + " is already declared in this scope.");
+					error("Function declaration " + fd.name + " is already declared in this scope.");
 				} else {
-					currentScope.put(new FunSymbol(fd.name, fd));
+					currentScope.put(new FunctionSymbol(fd.name, fd));
 				}
-				// process params in new inner scope
-				Scope saved = currentScope;
-				currentScope = new Scope(currentScope);
+
+				Scope prev = currentScope;
+				currentScope = new Scope(prev);
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
-				currentScope = saved;
+				currentScope = prev;
 			}
 
 			case FunDef fd -> {
-				// check duplicate func def
+				// check duplicate func def in current scope
 				if (currentScope.lookupCurrent(fd.name) != null) {
-					error("Function " + fd.name + " is already declared in this scope.");
+					error("Function definition " + fd.name + " is already declared in this scope.");
 				} else {
-					currentScope.put(new FunSymbol(fd.name, fd));
+					currentScope.put(new FunctionSymbol(fd.name, fd));
 				}
 
-				Scope saved = currentScope;
-				currentScope = new Scope(currentScope);
+				Scope prev = currentScope;
+				currentScope = new Scope(prev);
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
 				visit(fd.block);
-				currentScope = saved;
+				currentScope = prev;
 			}
 
 			case Program p -> {
-				currentScope = new Scope();     // create global scope
-				// visit each top-level decl
+				// program decl are in global scope
 				for (Decl d : p.decls) {
 					visit(d);
 				}
 			}
 
 			case VarDecl vd -> {
-				// check duplicate var decl
+				// check duplicate var decl in current scope
 				if (currentScope.lookupCurrent(vd.name) != null) {
 					error("Variable " + vd.name + " is already declared in this scope.");
 				} else {
-					currentScope.put(new VarSymbol(vd.name, vd));
+					currentScope.put(new VariableSymbol(vd.name, vd));
 				}
 			}
 
 			case VarExpr v -> {
-				// look up var in scope chain
+				// lookup var in current scope
 				Symbol sym = currentScope.lookup(v.name);
 				if (sym == null) {
 					error("Variable " + v.name + " is not declared.");
-				} else if (sym instanceof VarSymbol vs) {
-					v.vd = vs.decl;
 				} else {
-					error("Identifier " + v.name + " is not a variable.");
+					if (sym instanceof VariableSymbol vs) {
+						// link VarExpr with its corresponding VarDecl
+						v.vd = vs.decl;
+					} else {
+						error("Identifier " + v.name + " does not refer to a variable.");
+					}
 				}
 			}
 
 			case StructTypeDecl std -> {
-				Scope structScope = new Scope();
-				for (Decl field : std.getFields()) {
-					if (structScope.lookupCurrent(field.name) != null) {
+				// check duplicate struct type decl in current scope
+				if (currentScope.lookupCurrent(std.getName()) != null) {
+					error("Struct type " + std.getName() + " is already declared in this scope.");
+				} else {
+					currentScope.put(new StructSymbol(std.getName(), std));
+				}
+				Scope prev = currentScope;
+				currentScope = new Scope(prev);
+				for (ASTNode child : std.children()) {
+					VarDecl field = (VarDecl) child;
+					if (currentScope.lookupCurrent(field.name) != null) {
 						error("Field " + field.name + " is already declared in struct " + std.getName());
 					} else {
-						// assume all fields are VarDecls
-						structScope.put(new VarSymbol(field.name, (VarDecl) field));
+						currentScope.put(new VariableSymbol(field.name, field));
 					}
 				}
-				// add the struct type itself to current scope
-				if (currentScope.lookupCurrent(std.getName()) != null) {
-					error("Struct " + std.getName() + " is already declared in this scope.");
-				} else {
-					currentScope.put(new FunSymbol(std.getName(), std));
-				}
+				currentScope = prev;
 			}
 
-			case Type t -> {}
+			case Type t -> {
+				// nothing to do
+			}
 
 			default -> {
 				for (ASTNode child : node.children()) {
 					visit(child);
 				}
 			}
-
-        };
-
+		}
 	}
 
+	// Inner classes
+	static class VariableSymbol extends Symbol {
+		public VarDecl decl;
 
+		public VariableSymbol(String name, VarDecl decl) {
+			super(name);
+			this.decl = decl;
+		}
+	}
 
+	static class FunctionSymbol extends Symbol {
+		// is either a func decl or def
+		public Decl decl;
 
+		public FunctionSymbol(String name, Decl decl) {
+			super(name);
+			this.decl = decl;
+		}
+	}
+
+	static class StructSymbol extends Symbol {
+		public StructTypeDecl decl;
+
+		public StructSymbol(String name, StructTypeDecl decl) {
+			super(name);
+			this.decl = decl;
+		}
+	}
 }

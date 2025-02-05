@@ -17,8 +17,4 @@ public final class IntLiteral extends Expr {
         return new ArrayList<>();
     }
 
-    @Override
-    public String toString() {
-        return "IntLiteral(" + value + ")";
-    }
 }

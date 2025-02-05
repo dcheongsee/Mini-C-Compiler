@@ -17,10 +17,6 @@ public final class StructTypeDecl extends Decl {
         return name;
     }
 
-    public List<Decl> getFields() {
-        return fields;
-    }
-
     public List<ASTNode> children() {
         List<ASTNode> children = new ArrayList<>();
         children.addAll(fields);

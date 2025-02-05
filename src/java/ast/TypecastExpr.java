@@ -22,8 +22,4 @@ public final class TypecastExpr extends Expr {
         return children;
     }
 
-    @Override
-    public String toString() {
-        return "TypecastExpr(" + castType + ", " + expr + ")";
-    }
 }

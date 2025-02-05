@@ -5,95 +5,78 @@ import ast.*;
 public class TypeAnalyzer extends BaseSemanticAnalyzer {
 
 	public Type visit(ASTNode node) {
-		return switch(node) {
+		return switch (node) {
 			case null -> {
 				throw new IllegalStateException("Unexpected null value");
 			}
-
 			case Block b -> {
-				// block is a stmt, so it doesn't produce an expr type
-				for (VarDecl vd : b.vds) {
-					visit(vd);
-				}
-				for (Stmt s : b.stmts) {
-					visit(s);
+				// visit each child of the block
+				for (ASTNode c : b.children()) {
+					visit(c);
 				}
 				yield BaseType.NONE;
 			}
-
 			case FunDecl fd -> {
-				// check func return type
-				visit(fd.type);
+				// visit its params
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
-
+				// no body to check
 				yield fd.type;
 			}
-
 			case FunDef fd -> {
-				// also visit the func body
-				visit(fd.type);
+				// visit params
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
-				visit(fd.block);
+				// visit body
+				Type bodyType = visit(fd.block);
 				yield fd.type;
 			}
-
 			case Program p -> {
-				// visit top-level decl, ignore return types for stmts
+				// visit all decl in the program
 				for (Decl d : p.decls) {
 					visit(d);
 				}
 				yield BaseType.NONE;
 			}
-
 			case VarDecl vd -> {
-				// var decl not void
-				Type declaredType = visit(vd.type);
-				if (declaredType == BaseType.VOID) {
-					error("Cannot declare variable of type void: " + vd.name);
+				// type check the declared type
+				Type t = visit(vd.type);
+				if (t == BaseType.VOID) {
+					error("Variable " + vd.name + " cannot be declared void.");
 				}
-
-				yield declaredType;
+				yield t;
 			}
-
 			case VarExpr v -> {
-				// if name analysis linked vd, use that type, else unknown
-				if (v.vd != null) {
-					v.type = visit(v.vd.type);
+				if (v.vd == null) {
+					error("Variable " + v.name + " is not linked to any declaration.");
+					yield BaseType.UNKNOWN;
 				} else {
-					v.type = BaseType.UNKNOWN;
-					error("VarExpr " + v.name + " has no linked VarDecl.");
+					yield visit(v.vd);
 				}
-				yield v.type;
 			}
-
 			case StructTypeDecl std -> {
-				// visit each field's decl
-				for (Decl field : std.getFields()) {
-					visit(field);
+				// visit each field
+				for (ASTNode child : std.children()) {
+					VarDecl field = (VarDecl) child;
+					Type fType = visit(field);
+					if (fType == BaseType.VOID) {
+						error("Field " + field.name + " in struct " + std.getName() + " cannot be void.");
+					}
 				}
-
-				yield BaseType.NONE;
+				yield new StructType(std.getName());
 			}
-
 			case Type t -> {
 				yield t;
 			}
-
 			default -> {
-				// visit its children and yield none
 				for (ASTNode child : node.children()) {
 					visit(child);
 				}
-				yield BaseType.NONE;
+				yield BaseType.UNKNOWN;
 			}
-
 		};
-
 	}
-
 
 }

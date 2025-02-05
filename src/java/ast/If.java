@@ -3,15 +3,13 @@ package ast;
 import java.util.ArrayList;
 import java.util.List;
 
-
-// if stmt with optional else branch
 public final class If extends Stmt {
-    public final Expr cond;
-    public final Stmt thenStmt;
-    public final Stmt elseStmt; // may be null
+    public final Expr expr;      // condition
+    public final Stmt thenStmt;  // stmt executed if condition is true
+    public final Stmt elseStmt;  // stmt executed if condition is false (can be null)
 
-    public If(Expr cond, Stmt thenStmt, Stmt elseStmt) {
-        this.cond = cond;
+    public If(Expr expr, Stmt thenStmt, Stmt elseStmt) {
+        this.expr = expr;
         this.thenStmt = thenStmt;
         this.elseStmt = elseStmt;
     }
@@ -19,14 +17,10 @@ public final class If extends Stmt {
     @Override
     public List<ASTNode> children() {
         List<ASTNode> children = new ArrayList<>();
-        children.add(cond);
+        children.add(expr);
         children.add(thenStmt);
-        if (elseStmt != null) children.add(elseStmt);
+        if (elseStmt != null)
+            children.add(elseStmt);
         return children;
-    }
-
-    @Override
-    public String toString() {
-        return "If(" + cond + ", " + thenStmt + ", " + elseStmt + ")";
     }
 }

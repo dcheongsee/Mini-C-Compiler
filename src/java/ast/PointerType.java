@@ -19,8 +19,4 @@ public final class PointerType implements Type {
         return children;
     }
 
-    @Override
-    public String toString() {
-        return "PointerType(" + base + ")";
-    }
 }
