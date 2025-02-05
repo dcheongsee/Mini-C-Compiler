@@ -13,6 +13,14 @@ public final class StructTypeDecl extends Decl {
         this.fields = fields;
     }
 
+    public String getName() {
+        return name;
+    }
+
+    public List<Decl> getFields() {
+        return fields;
+    }
+
     public List<ASTNode> children() {
         List<ASTNode> children = new ArrayList<>();
         children.addAll(fields);

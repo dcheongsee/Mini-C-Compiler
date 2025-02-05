@@ -11,46 +11,86 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			}
 
 			case Block b -> {
-				for (ASTNode c : b.children())
-					visit(b);
+				// block is a stmt, so it doesn't produce an expr type
+				for (VarDecl vd : b.vds) {
+					visit(vd);
+				}
+				for (Stmt s : b.stmts) {
+					visit(s);
+				}
 				yield BaseType.NONE;
 			}
 
 			case FunDecl fd -> {
-				// to complete
-				yield BaseType.NONE;
+				// check func return type
+				visit(fd.type);
+				for (VarDecl param : fd.params) {
+					visit(param);
+				}
+
+				yield fd.type;
 			}
 
 			case FunDef fd -> {
-				// to complete
-				yield BaseType.NONE;
+				// also visit the func body
+				visit(fd.type);
+				for (VarDecl param : fd.params) {
+					visit(param);
+				}
+				visit(fd.block);
+				yield fd.type;
 			}
 
 			case Program p -> {
-				// to complete
+				// visit top-level decl, ignore return types for stmts
+				for (Decl d : p.decls) {
+					visit(d);
+				}
 				yield BaseType.NONE;
 			}
 
 			case VarDecl vd -> {
-				// to complete
-				yield BaseType.NONE;
+				// var decl not void
+				Type declaredType = visit(vd.type);
+				if (declaredType == BaseType.VOID) {
+					error("Cannot declare variable of type void: " + vd.name);
+				}
+
+				yield declaredType;
 			}
 
 			case VarExpr v -> {
-				// to complete
-				yield BaseType.UNKNOWN; // to change
+				// if name analysis linked vd, use that type, else unknown
+				if (v.vd != null) {
+					v.type = visit(v.vd.type);
+				} else {
+					v.type = BaseType.UNKNOWN;
+					error("VarExpr " + v.name + " has no linked VarDecl.");
+				}
+				yield v.type;
 			}
 
 			case StructTypeDecl std -> {
-				// to complete
-				yield BaseType.UNKNOWN; // to change
+				// visit each field's decl
+				for (Decl field : std.getFields()) {
+					visit(field);
+				}
+
+				yield BaseType.NONE;
 			}
 
 			case Type t -> {
 				yield t;
 			}
 
-			// to complete ...
+			default -> {
+				// visit its children and yield none
+				for (ASTNode child : node.children()) {
+					visit(child);
+				}
+				yield BaseType.NONE;
+			}
+
 		};
 
 	}

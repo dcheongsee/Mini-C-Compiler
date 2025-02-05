@@ -1,6 +1,8 @@
 package sem;
 
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 public class Scope {
 	private Scope outer;
@@ -11,15 +13,19 @@ public class Scope {
 	}
 	
 	public Scope() { this(null); }
-	
+
 	public Symbol lookup(String name) {
-		// To be completed...
-		return null;
+		// stream to iterate over scope chain
+		return Stream.iterate(this, s -> s.outer)
+				.filter(Objects::nonNull)
+				.map(s -> s.symbolTable.get(name))
+				.filter(Objects::nonNull)
+				.findFirst()
+				.orElse(null);
 	}
-	
+
 	public Symbol lookupCurrent(String name) {
-		// To be completed...
-		return null;
+		return symbolTable.get(name);
 	}
 	
 	public void put(Symbol sym) {
