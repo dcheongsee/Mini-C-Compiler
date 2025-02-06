@@ -183,27 +183,30 @@ public class Parser extends CompilerPass {
 
     // *new*,  returns a declaration AST node for a var
     private VarDecl parseVariableDecl() {
-        Type type = parseType();
+        Type baseType = parseType();
         Token ident = expect(Category.IDENTIFIER);
-        parseArrayDimensions();
+        Type finalType = parseArrayDimensions(baseType);
         expect(Category.SC);
-        return new VarDecl(type, ident.data);
+        return new VarDecl(finalType, ident.data);
     }
 
     // those that appear after type and identifier
     private Decl parseVarDeclSuffix(Type type, Token ident) {
-        parseArrayDimensions();
+        Type finalType = parseArrayDimensions(type);
         expect(Category.SC);
-        return new VarDecl(type, ident.data);
+        return new VarDecl(finalType, ident.data);
     }
 
     //  array dimensions in square brackets
-    private void parseArrayDimensions() {
+    private Type parseArrayDimensions(Type base) {
         while (accept(Category.LSBR)) {
             expect(Category.LSBR);
-            expect(Category.INT_LITERAL);
+            Token intToken = expect(Category.INT_LITERAL);
+            int length = Integer.parseInt(intToken.data);
             expect(Category.RSBR);
+            base = new ArrayType(base, length);
         }
+        return base;
     }
 
     // allows for 0 or more comma separated args
@@ -221,10 +224,10 @@ public class Parser extends CompilerPass {
 
     // single param in func decl
     private VarDecl parseParam() {
-        Type type = parseType();
+        Type baseType = parseType();
         Token ident = expect(Category.IDENTIFIER);
-        parseArrayDimensions();
-        return new VarDecl(type, ident.data);
+        Type finalType = parseArrayDimensions(baseType);
+        return new VarDecl(finalType, ident.data);
     }
 
     private Type parseType() {
@@ -235,7 +238,7 @@ public class Parser extends CompilerPass {
 
             type = BaseType.UNKNOWN;
         } else {
-            // expect one of INT, CHAR, VOID
+            // expect one of int, char, void
             Token t = expect(Category.INT, Category.CHAR, Category.VOID);
             switch (t.category) {
                 case INT:
@@ -260,7 +263,7 @@ public class Parser extends CompilerPass {
     }
 
     private Block parseBlock() {
-        Block block = new Block(); // vds and stmts are initialized in the constructor
+        Block block = new Block(); // vds and stmts initialized in the constructor
         expect(Category.LBRA);
         while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT)) {
             // each var decl returns a VarDecl node which we add to block.vds

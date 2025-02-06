@@ -13,6 +13,21 @@ public class ASTPrinter {
     public void visit(ASTNode node) {
         if (node == null)
             throw new IllegalStateException("Unexpected null value");
+
+        if (node instanceof VarExpr ve) {
+            writer.print("VarExpr(" + ve.name + ")");
+            return;
+        }
+
+        if (node instanceof BaseType bt) {
+            writer.print(bt);
+            return;
+        }
+
+        if (node instanceof StructType st) {
+            writer.print(st);
+            return;
+        }
         writer.print(node.getClass().getSimpleName() + "(");
 
         switch (node) {
@@ -37,9 +52,6 @@ public class ASTPrinter {
             case VarDecl vd -> {
                 visit(vd.type);
                 writer.print("," + vd.name);
-            }
-            case VarExpr v -> {
-                writer.print(v.name);
             }
             case FunCallExpr fc -> {
                 writer.print(fc.name);
@@ -76,7 +88,7 @@ public class ASTPrinter {
                 writer.print("," + fa.field);
             }
             case TypecastExpr tc -> {
-                visit(tc.type);
+                visit(tc.castType);
                 writer.print(",");
                 visit(tc.expr);
             }
@@ -128,6 +140,7 @@ public class ASTPrinter {
             case ExprStmt es -> {
                 visit(es.expr);
             }
+
             default -> {
                 String delimiter = "";
                 for (ASTNode child : node.children()) {

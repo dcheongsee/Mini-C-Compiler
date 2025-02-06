@@ -1,6 +1,7 @@
 package sem;
 
 import ast.*;
+import java.util.List;
 
 public class TypeAnalyzer extends BaseSemanticAnalyzer {
 
@@ -70,6 +71,81 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			case Type t -> {
 				yield t;
 			}
+			case BinOp bin -> {
+				Type leftType = visit(bin.left);
+				Type rightType = visit(bin.right);
+				if (leftType == BaseType.INT && rightType == BaseType.INT) {
+					yield BaseType.INT;
+				} else {
+					error("BinOp operands are not both int.");
+					yield BaseType.UNKNOWN;
+				}
+			}
+			case ArrayAccessExpr aa -> {
+				Type arrayType = visit(aa.array);
+				Type indexType = visit(aa.index);
+				if (!indexType.equals(BaseType.INT)) {
+					error("Array index is not an int.");
+					yield BaseType.UNKNOWN;
+				}
+				if (arrayType instanceof ArrayType at) {
+					yield at.elementType;
+				} else {
+					error("Array access on a non-array type.");
+					yield BaseType.UNKNOWN;
+				}
+			}
+			case FunCallExpr fc -> {
+				if (fc.decl == null) {
+					error("Function " + fc.name + " is not declared.");
+					yield BaseType.UNKNOWN;
+				}
+				List<VarDecl> formals;
+				if (fc.decl instanceof FunDecl fd) {
+					formals = fd.params;
+				} else if (fc.decl instanceof FunDef fd) {
+					formals = fd.params;
+				} else {
+					yield BaseType.UNKNOWN;
+				}
+				if (formals.size() != fc.args.size()) {
+					error("Function " + fc.name + " called with incorrect number of arguments.");
+					yield BaseType.UNKNOWN;
+				}
+				for (int i = 0; i < formals.size(); i++) {
+					Type formal = visit(formals.get(i));
+					Type actual = visit(fc.args.get(i));
+					if (formal instanceof ArrayType atFormal && actual instanceof ArrayType atActual) {
+						if (atFormal.length != atActual.length) {
+							error("Array size mismatch for parameter " + formals.get(i).name +
+									" in function " + fc.name + ": expected " + atFormal.length +
+									", got " + atActual.length + ".");
+						}
+					} else if (!formal.equals(actual)) {
+						error("Type mismatch for parameter " + formals.get(i).name +
+								" in function " + fc.name + ".");
+					}
+				}
+				if (fc.decl instanceof FunDecl fd) yield fd.type;
+				else if (fc.decl instanceof FunDef fd) yield fd.type;
+				else yield BaseType.UNKNOWN;
+			}
+
+			case Assign assign -> {
+				Type leftType = visit(assign.left);
+				Type rightType = visit(assign.right);
+				if (!leftType.equals(rightType)) {
+					error("Assignment type mismatch: " + leftType + " does not match " + rightType);
+					yield BaseType.UNKNOWN;
+				} else {
+					yield leftType;
+				}
+			}
+
+			case IntLiteral il -> BaseType.INT;
+			case ChrLiteral cl -> BaseType.CHAR;
+			case StrLiteral sl -> new ArrayType(BaseType.CHAR, sl.value.length() + 1);
+
 			default -> {
 				for (ASTNode child : node.children()) {
 					visit(child);

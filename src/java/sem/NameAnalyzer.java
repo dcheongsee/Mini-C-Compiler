@@ -106,6 +106,21 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 				currentScope = prev;
 			}
 
+			case FunCallExpr fc -> {
+				Symbol sym = currentScope.lookup(fc.name);
+				if (sym == null) {
+					error("Function " + fc.name + " is not declared.");
+				} else if (sym instanceof FunctionSymbol fs) {
+					fc.decl = fs.decl;
+				} else {
+					error("Identifier " + fc.name + " does not refer to a function.");
+				}
+				// visit each arg
+				for (Expr arg : fc.args) {
+					visit(arg);
+				}
+			}
+
 			case Type t -> {
 				// nothing to do
 			}

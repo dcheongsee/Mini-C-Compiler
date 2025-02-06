@@ -9,4 +9,5 @@ public enum BaseType implements Type {
     public List<ASTNode> children() {
         return new ArrayList<ASTNode>();
     }
+
 }
