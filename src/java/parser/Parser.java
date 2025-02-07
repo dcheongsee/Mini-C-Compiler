@@ -442,16 +442,9 @@ public class Parser extends CompilerPass {
                 default:
                     return expr;
             }
-        } else if (accept(Category.LPAR)) {
-            // check for typecast i.e (Type)Expr
-            if (isType(lookAhead(1).category)) {
-                return parseTypecast();
-            } else {
-                expect(Category.LPAR);
-                Expr e = parseExp();
-                expect(Category.RPAR);
-                return e;
-            }
+        } else if (accept(Category.LPAR) && isType(lookAhead(1).category)) {
+            // this branch is for typecasting
+            return parseTypecast();
         } else {
             return parsePrimary();
         }

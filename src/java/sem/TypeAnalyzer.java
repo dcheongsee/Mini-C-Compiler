@@ -5,6 +5,8 @@ import java.util.List;
 
 public class TypeAnalyzer extends BaseSemanticAnalyzer {
 
+	private List<Decl> globalDecls;
+
 	public Type visit(ASTNode node) {
 		return switch (node) {
 			case null -> {
@@ -35,7 +37,8 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				yield fd.type;
 			}
 			case Program p -> {
-				// visit all decl in the program
+				// record global declarations for later lookup
+				this.globalDecls = p.decls;
 				for (Decl d : p.decls) {
 					visit(d);
 				}
@@ -58,8 +61,8 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				}
 			}
 			case StructTypeDecl std -> {
-				// visit each field
 				for (ASTNode child : std.children()) {
+					if (!(child instanceof VarDecl)) continue;
 					VarDecl field = (VarDecl) child;
 					Type fType = visit(field);
 					if (fType == BaseType.VOID) {
@@ -131,6 +134,10 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				else yield BaseType.UNKNOWN;
 			}
 
+			case TypecastExpr tc -> {
+				yield visit(tc.castType);
+			}
+
 			case Assign assign -> {
 				Type leftType = visit(assign.left);
 				Type rightType = visit(assign.right);
@@ -139,6 +146,35 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					yield BaseType.UNKNOWN;
 				} else {
 					yield leftType;
+				}
+			}
+
+			case FieldAccessExpr fa -> {
+				// get type of the expr
+				Type structType = visit(fa.expr);
+				if (structType instanceof StructType st) {
+					// lookup struct decl using the global decl
+					StructTypeDecl decl = lookupStructDecl(st.name);
+					if (decl == null) {
+						error("No declaration found for struct " + st.name);
+						yield BaseType.UNKNOWN;
+					}
+					Type fieldType = null;
+					for (ASTNode child : decl.children()) {
+						if (child instanceof VarDecl field && field.name.equals(fa.field)) {
+							fieldType = visit(field);
+							break;
+						}
+					}
+					if (fieldType == null) {
+						error("Unknown field " + fa.field + " in struct " + st.name);
+						yield BaseType.UNKNOWN;
+					} else {
+						yield fieldType;
+					}
+				} else {
+					error("Field access on non-struct type.");
+					yield BaseType.UNKNOWN;
 				}
 			}
 
@@ -153,6 +189,17 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				yield BaseType.UNKNOWN;
 			}
 		};
+	}
+
+	private StructTypeDecl lookupStructDecl(String structName) {
+		if (globalDecls != null) {
+			for (Decl d : globalDecls) {
+				if (d instanceof StructTypeDecl std && std.getName().equals(structName)) {
+					return std;
+				}
+			}
+		}
+		return null;
 	}
 
 }

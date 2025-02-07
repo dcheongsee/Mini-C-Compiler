@@ -14,6 +14,11 @@ public class ASTPrinter {
         if (node == null)
             throw new IllegalStateException("Unexpected null value");
 
+        if (node instanceof ArrayLength al) {
+            writer.print(al.value);
+            return;
+        }
+
         if (node instanceof VarExpr ve) {
             writer.print("VarExpr(" + ve.name + ")");
             return;

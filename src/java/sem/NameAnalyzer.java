@@ -56,9 +56,17 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 			}
 
 			case Program p -> {
-				// program decl are in global scope
+				// process built‐in functions
 				for (Decl d : p.decls) {
-					visit(d);
+					if (isBuiltin(d)) {
+						visit(d);
+					}
+				}
+				// process all other declarations
+				for (Decl d : p.decls) {
+					if (!isBuiltin(d)) {
+						visit(d);
+					}
 				}
 			}
 
@@ -95,8 +103,9 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 				}
 				Scope prev = currentScope;
 				currentScope = new Scope(prev);
-				for (ASTNode child : std.children()) {
-					VarDecl field = (VarDecl) child;
+				// iterate over the actual fields
+				for (Decl fieldDecl : std.getFields()) {
+					VarDecl field = (VarDecl) fieldDecl;
 					if (currentScope.lookupCurrent(field.name) != null) {
 						error("Field " + field.name + " is already declared in struct " + std.getName());
 					} else {
@@ -160,5 +169,18 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 			super(name);
 			this.decl = decl;
 		}
+	}
+
+	private boolean isBuiltin(Decl d) {
+		if (d instanceof FunDecl fd) {
+			String name = fd.name;
+			return name.equals("read_i") ||
+					name.equals("print_c") ||
+					name.equals("read_c") ||
+					name.equals("mcmalloc") ||
+					name.equals("print_s") ||
+					name.equals("print_i");
+		}
+		return false;
 	}
 }

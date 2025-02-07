@@ -13,6 +13,11 @@ public final class ArrayType implements Type {
     }
 
     @Override
-    public List<ASTNode> children() { return new ArrayList<>(); }
+    public List<ASTNode> children() {
+        List<ASTNode> children = new ArrayList<>();
+        children.add(elementType);
+        children.add(new ArrayLength(length));
+        return children;
+    }
 
 }
