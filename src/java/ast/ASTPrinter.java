@@ -130,6 +130,24 @@ public class ASTPrinter {
                 }
             }
 
+            case StructType st -> {
+                writer.print(st.name);
+            }
+
+            case ArrayAccessExpr aa -> {
+                visit(aa.array);
+                writer.print(",");
+                visit(aa.index);
+            }
+
+            case ValueAtExpr va -> {
+                visit(va.expr);
+            }
+
+            case ExprStmt es -> {
+                visit(es.expr);
+            }
+
             case Continue c -> { }
             case Break b -> { }
 
