@@ -20,4 +20,17 @@ public final class StructType implements Type {
     @Override
     public String toString() { return "StructType(" + name + ")";
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof StructType)) return false;
+        StructType that = (StructType) o;
+        return name.equals(that.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return name.hashCode();
+    }
 }

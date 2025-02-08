@@ -19,4 +19,17 @@ public final class PointerType implements Type {
         return children;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof PointerType)) return false;
+        PointerType that = (PointerType) o;
+        return base.equals(that.base);
+    }
+
+    @Override
+    public int hashCode() {
+        return base.hashCode();
+    }
+
 }

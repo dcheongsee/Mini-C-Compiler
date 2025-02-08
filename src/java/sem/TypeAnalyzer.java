@@ -84,6 +84,18 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					yield BaseType.UNKNOWN;
 				}
 			}
+			case AddressOfExpr ao -> {
+				yield new PointerType(visit(ao.expr));
+			}
+			case ValueAtExpr va -> {
+				Type t = visit(va.expr);
+				if (t instanceof PointerType pt) {
+					yield pt.base;
+				} else {
+					error("ValueAtExpr applied to non-pointer type.");
+					yield BaseType.UNKNOWN;
+				}
+			}
 			case ArrayAccessExpr aa -> {
 				Type arrayType = visit(aa.array);
 				Type indexType = visit(aa.index);
@@ -97,6 +109,9 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					error("Array access on a non-array type.");
 					yield BaseType.UNKNOWN;
 				}
+			}
+			case SizeOfExpr so -> {
+				yield BaseType.INT;
 			}
 			case FunCallExpr fc -> {
 				if (fc.decl == null) {
