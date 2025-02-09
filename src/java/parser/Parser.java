@@ -236,7 +236,7 @@ public class Parser extends CompilerPass {
             expect(Category.STRUCT);
             Token id = expect(Category.IDENTIFIER);
 
-            type = BaseType.UNKNOWN;
+            type = new StructType(id.data);
         } else {
             // expect one of int, char, void
             Token t = expect(Category.INT, Category.CHAR, Category.VOID);
@@ -257,7 +257,7 @@ public class Parser extends CompilerPass {
         }
         while (accept(Category.ASTERISK)) {
             expect(Category.ASTERISK);
-
+            type = new PointerType(type);
         }
         return type;
     }

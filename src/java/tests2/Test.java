@@ -1,121 +1,148 @@
 package tests2;
 
-import ast.*;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import lexer.Scanner;
+import ast.Program;
+import lexer.Tokeniser;
+import parser.Parser;
+import sem.SemanticAnalyzer;
 
 public class Test {
     public static void main(String[] args) {
-        VarDecl nDecl      = new VarDecl(BaseType.INT, "n");
-        VarDecl firstDecl  = new VarDecl(BaseType.INT, "first");
-        VarDecl secondDecl = new VarDecl(BaseType.INT, "second");
-        VarDecl nextDecl   = new VarDecl(BaseType.INT, "next");
-        VarDecl cDecl      = new VarDecl(BaseType.INT, "c");
-        VarDecl tDecl      = new VarDecl(BaseType.CHAR, "t");
+        // descriptions for each test
+        String[] testDescriptions = {
+                "Arithmetic interpreter: evaluate 2 + 3 * (4 - 1) / 2",
+                "Sort linked list: define struct Node and call sortList",
+                "Pass multi-dimensional array: process 2D array (2x3)",
+                "Complex function call: nested calls with arithmetic expressions",
+                "Valid L-values: assignments to variable, pointer, and array element",
+                "Struct declaration and use: struct Point with field accesses",
+                "Struct nesting: struct Outer contains struct Inner",
+                "Complex assignment expression: chained assignment with arithmetic"
+        };
 
-        FunCallExpr read_iCall = new FunCallExpr("read_i", List.of());
-        ExprStmt assign_n = new ExprStmt(new Assign(new VarExpr("n"), read_iCall));
+        String[] testPrograms = {
+                // Test 1: Arithmetic interpreter.
+                "void main() { " +
+                        "  int a; " +
+                        "  a = 2 + 3 * (4 - 1) / 2; " +
+                        "}",
 
-        ExprStmt assign_first = new ExprStmt(new Assign(new VarExpr("first"), new IntLiteral(0)));
-        ExprStmt assign_second = new ExprStmt(new Assign(new VarExpr("second"), new IntLiteral(1)));
+                // Test 2: Sort linked list.
+                "struct Node { " +
+                        "  int data; " +
+                        "  struct Node *next; " +
+                        "}; " +
+                        "struct Node* sortList(struct Node* head) { " +
+                        "  return head; " +
+                        "} " +
+                        "void main() { " +
+                        "  struct Node *head; " +
+                        "  head = sortList(head); " +
+                        "}",
 
-        ExprStmt print_s_first = new ExprStmt(new FunCallExpr("print_s", List.of(new StrLiteral("First "))));
-        ExprStmt print_i_n = new ExprStmt(new FunCallExpr("print_i", List.of(new VarExpr("n"))));
-        ExprStmt print_s_terms = new ExprStmt(new FunCallExpr("print_s", List.of(new StrLiteral(" terms of Fibonacci series are : "))));
+                // Test 3: Pass multi-dimensional array.
+                "void process(int arr[2][3]) { " +
+                        "  // No operation needed " +
+                        "} " +
+                        "void main() { " +
+                        "  int matrix[2][3]; " +
+                        "  process(matrix); " +
+                        "}",
 
-        ExprStmt assign_c = new ExprStmt(new Assign(new VarExpr("c"), new IntLiteral(0)));
+                // Test 4: Complex function call.
+                "int add(int x, int y) { " +
+                        "  return x + y; " +
+                        "} " +
+                        "int complexFunc(int a, int b, int c, int d) { " +
+                        "  return add(a, b) * add(c, d); " +
+                        "} " +
+                        "void main() { " +
+                        "  int result; " +
+                        "  result = complexFunc(1 + 2, 3 * 4, 5 - 6, 7 / 8); " +
+                        "}",
 
-        BinOp whileCond = new BinOp(new VarExpr("c"), Op.LT, new VarExpr("n"));
-        BinOp ifCond = new BinOp(new VarExpr("c"), Op.LE, new IntLiteral(1));
-        ExprStmt thenAssign_next = new ExprStmt(new Assign(new VarExpr("next"), new VarExpr("c")));
+                // Test 5: Valid L-values.
+                "void main() { " +
+                        "  int a; " +
+                        "  int *p; " +
+                        "  int arr[3]; " +
+                        "  a = 5; " +
+                        "  p = (int*)&a; " +
+                        "  *p = a + 1; " +
+                        "  arr[0] = a; " +
+                        "}",
 
-        ExprStmt elseAssign_next = new ExprStmt(new Assign(new VarExpr("next"), new BinOp(new VarExpr("first"), Op.ADD, new VarExpr("second"))));
-        ExprStmt elseAssign_first = new ExprStmt(new Assign(new VarExpr("first"), new VarExpr("second")));
-        ExprStmt elseAssign_second = new ExprStmt(new Assign(new VarExpr("second"), new VarExpr("next")));
-        Block elseBlock = new Block(new ArrayList<>(), List.of(elseAssign_next, elseAssign_first, elseAssign_second));
+                // Test 6: Struct declaration and use.
+                "struct Point { " +
+                        "  int x; " +
+                        "  int y; " +
+                        "}; " +
+                        "void main() { " +
+                        "  struct Point p; " +
+                        "  p.x = 10; " +
+                        "  p.y = 20; " +
+                        "}",
 
-        If ifStmt = new If(ifCond, thenAssign_next, elseBlock);
+                // Test 7: Struct nesting.
+                "struct Inner { " +
+                        "  int value; " +
+                        "}; " +
+                        "struct Outer { " +
+                        "  struct Inner inner; " +
+                        "  int extra; " +
+                        "}; " +
+                        "void main() { " +
+                        "  struct Outer o; " +
+                        "  o.inner.value = 100; " +
+                        "  o.extra = 200; " +
+                        "}",
 
-        ExprStmt print_i_next = new ExprStmt(new FunCallExpr("print_i", List.of(new VarExpr("next"))));
-        ExprStmt print_s_space = new ExprStmt(new FunCallExpr("print_s", List.of(new StrLiteral(" "))));
-        ExprStmt assign_c_inc = new ExprStmt(new Assign(new VarExpr("c"), new BinOp(new VarExpr("c"), Op.ADD, new IntLiteral(1))));
-        Block whileBody = new Block(new ArrayList<>(), List.of(ifStmt, print_i_next, print_s_space, assign_c_inc));
-        While whileStmt = new While(whileCond, whileBody);
+                // Test 8: Complex assignment expression.
+                "void main() { " +
+                        "  int a; " +
+                        "  int b; " +
+                        "  a = b = (2 + 3) * 4; " +
+                        "}"
+        };
 
-        List<VarDecl> decls = new ArrayList<>();
-        decls.add(nDecl);
-        decls.add(firstDecl);
-        decls.add(secondDecl);
-        decls.add(nextDecl);
-        decls.add(cDecl);
-        decls.add(tDecl);
-
-        List<Stmt> stmts = new ArrayList<>();
-        stmts.add(assign_n);
-        stmts.add(assign_first);
-        stmts.add(assign_second);
-        stmts.add(print_s_first);
-        stmts.add(print_i_n);
-        stmts.add(print_s_terms);
-        stmts.add(assign_c);
-        stmts.add(whileStmt);
-
-        Block mainBlock = new Block(decls, stmts);
-
-        FunDef mainFun = new FunDef(BaseType.VOID, "main", new ArrayList<>(), mainBlock);
-
-        Program program = new Program(List.of(mainFun));
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        ASTPrinter printer = new ASTPrinter(pw);
-        printer.visit(program);
-        pw.flush();
-        String output = sw.toString();
-        System.out.println("AST Printer Output:");
-        System.out.println(output);
-
-
-        String expected = "Program(FunDef(VOID,main,Block(" +
-                "VarDecl(INT,n)," +
-                "VarDecl(INT,first)," +
-                "VarDecl(INT,second)," +
-                "VarDecl(INT,next)," +
-                "VarDecl(INT,c)," +
-                "VarDecl(CHAR,t)," +
-                "ExprStmt(Assign(VarExpr(n),FunCallExpr(read_i())))," +
-                "ExprStmt(Assign(VarExpr(first),IntLiteral(0)))," +
-                "ExprStmt(Assign(VarExpr(second),IntLiteral(1)))," +
-                "ExprStmt(FunCallExpr(print_s,StrLiteral(First )))," +
-                "ExprStmt(FunCallExpr(print_i,VarExpr(n)))," +
-                "ExprStmt(FunCallExpr(print_s,StrLiteral( terms of Fibonacci series are : )))," +
-                "ExprStmt(Assign(VarExpr(c),IntLiteral(0)))," +
-                "ExprStmt(While(" +
-                "BinOp(VarExpr(c),LT,VarExpr(n))," +
-                "Block(" +
-                "If(" +
-                "BinOp(VarExpr(c),LE,IntLiteral(1))," +
-                "ExprStmt(Assign(VarExpr(next),VarExpr(c)))," +
-                "Block(" +
-                "ExprStmt(Assign(VarExpr(next),BinOp(VarExpr(first),ADD,VarExpr(second))))," +
-                "ExprStmt(Assign(VarExpr(first),VarExpr(second)))," +
-                "ExprStmt(Assign(VarExpr(second),VarExpr(next)))" +
-                ")" +
-                ")," +
-                "ExprStmt(FunCallExpr(print_i,VarExpr(next)))," +
-                "ExprStmt(FunCallExpr(print_s,StrLiteral( )))," +
-                "ExprStmt(Assign(VarExpr(c),BinOp(VarExpr(c),ADD,IntLiteral(1))))" +
-                ")" +
-                "))" +
-                "))";
-        System.out.println("\nExpected Output:");
-        System.out.println(expected);
-
-        if (output.equals(expected)) {
-            System.out.println("\nTest Passed: Output matches expected output.");
-        } else {
-            System.out.println("\nTest Failed: Output does not match expected output.");
+        // run tests
+        for (int i = 0; i < testPrograms.length; i++) {
+            System.out.println("-------------------------------------------------");
+            System.out.println("Test " + (i + 1) + ": " + testDescriptions[i]);
+            boolean success = runTest(testPrograms[i]);
+            System.out.println("Result: " + (success ? "Passed" : "Failed (semantic errors detected)"));
+            System.out.println();
         }
+    }
+
+    private static boolean runTest(String source) {
+        try {
+            File tempFile = createTempFile(source);
+            Scanner scanner = new Scanner(tempFile);
+            Tokeniser tokeniser = new Tokeniser(scanner);
+            Parser parser = new Parser(tokeniser);
+            Program prog = parser.parse();
+
+            SemanticAnalyzer semAnalyzer = new SemanticAnalyzer();
+            semAnalyzer.analyze(prog);
+
+            int errors = semAnalyzer.getNumErrors();
+            return errors == 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private static File createTempFile(String source) throws IOException {
+        File tempFile = File.createTempFile("testProgram", ".c");
+        tempFile.deleteOnExit();
+        try (FileWriter writer = new FileWriter(tempFile)) {
+            writer.write(source);
+        }
+        return tempFile;
     }
 }

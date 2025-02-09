@@ -19,6 +19,12 @@ public class ASTPrinter {
             return;
         }
 
+        // we do not want to print a wrapper for this also
+        if (node instanceof ArrayLength al) {
+            writer.print(al.value);
+            return;
+        }
+
         // print node's class name and opening paren
         writer.print(node.getClass().getSimpleName() + "(");
 
@@ -64,10 +70,6 @@ public class ASTPrinter {
                 writer.print(sl.value);
             }
 
-            case ArrayLength al -> {
-                writer.print(al.value);
-            }
-
             case BinOp bin -> {
                 visit(bin.left);
                 writer.print("," + bin.op + ",");
@@ -91,6 +93,14 @@ public class ASTPrinter {
 
             case SizeOfExpr so -> {
                 visit(so.type);
+            }
+
+            case FunCallExpr fc -> {
+                writer.print(fc.name);
+                for (Expr arg : fc.args) {
+                    writer.print(",");
+                    visit(arg);
+                }
             }
 
             case Assign assign -> {
