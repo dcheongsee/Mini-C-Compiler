@@ -16,7 +16,7 @@ public class SemanticAnalyzer extends CompilerPass {
 						new FunDecl(BaseType.VOID, "print_c", List.of(new VarDecl(BaseType.CHAR, "c"))),
 						new FunDecl(BaseType.CHAR, "read_c", List.of()),
 						new FunDecl(BaseType.VOID, "mcmalloc", List.of(new VarDecl(BaseType.INT, "size"))),
-						new FunDecl(BaseType.VOID, "print_s", List.of(new VarDecl(BaseType.CHAR, "s"))),
+						new FunDecl(BaseType.VOID, "print_s", List.of(new VarDecl(new PointerType(BaseType.CHAR), "s"))),
 						new FunDecl(BaseType.VOID, "print_i", List.of(new VarDecl(BaseType.INT, "i")))
 				).collect(Collectors.toList())
 		);

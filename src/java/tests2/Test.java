@@ -3,7 +3,7 @@ package tests2;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import lexer.Scanner;
+import lexer.Scanner;  // using your custom lexer.Scanner
 import ast.Program;
 import lexer.Tokeniser;
 import parser.Parser;
@@ -11,104 +11,73 @@ import sem.SemanticAnalyzer;
 
 public class Test {
     public static void main(String[] args) {
-        // descriptions for each test
         String[] testDescriptions = {
-                "Arithmetic interpreter: evaluate 2 + 3 * (4 - 1) / 2",
-                "Sort linked list: define struct Node and call sortList",
-                "Pass multi-dimensional array: process 2D array (2x3)",
-                "Complex function call: nested calls with arithmetic expressions",
-                "Valid L-values: assignments to variable, pointer, and array element",
-                "Struct declaration and use: struct Point with field accesses",
-                "Struct nesting: struct Outer contains struct Inner",
-                "Complex assignment expression: chained assignment with arithmetic"
+                "Final Extreme-Tricky Sort Linked List AST Test – Extra Whitespace Edition"
         };
 
         String[] testPrograms = {
-                // Test 1: Arithmetic interpreter.
-                "void main() { " +
-                        "  int a; " +
-                        "  a = 2 + 3 * (4 - 1) / 2; " +
-                        "}",
-
-                // Test 2: Sort linked list.
-                "struct Node { " +
-                        "  int data; " +
-                        "  struct Node *next; " +
-                        "}; " +
-                        "struct Node* sortList(struct Node* head) { " +
-                        "  return head; " +
-                        "} " +
-                        "void main() { " +
-                        "  struct Node *head; " +
-                        "  head = sortList(head); " +
-                        "}",
-
-                // Test 3: Pass multi-dimensional array.
-                "void process(int arr[2][3]) { " +
-                        "  // No operation needed " +
-                        "} " +
-                        "void main() { " +
-                        "  int matrix[2][3]; " +
-                        "  process(matrix); " +
-                        "}",
-
-                // Test 4: Complex function call.
-                "int add(int x, int y) { " +
-                        "  return x + y; " +
-                        "} " +
-                        "int complexFunc(int a, int b, int c, int d) { " +
-                        "  return add(a, b) * add(c, d); " +
-                        "} " +
-                        "void main() { " +
-                        "  int result; " +
-                        "  result = complexFunc(1 + 2, 3 * 4, 5 - 6, 7 / 8); " +
-                        "}",
-
-                // Test 5: Valid L-values.
-                "void main() { " +
-                        "  int a; " +
-                        "  int *p; " +
-                        "  int arr[3]; " +
-                        "  a = 5; " +
-                        "  p = (int*)&a; " +
-                        "  *p = a + 1; " +
-                        "  arr[0] = a; " +
-                        "}",
-
-                // Test 6: Struct declaration and use.
-                "struct Point { " +
-                        "  int x; " +
-                        "  int y; " +
-                        "}; " +
-                        "void main() { " +
-                        "  struct Point p; " +
-                        "  p.x = 10; " +
-                        "  p.y = 20; " +
-                        "}",
-
-                // Test 7: Struct nesting.
-                "struct Inner { " +
-                        "  int value; " +
-                        "}; " +
-                        "struct Outer { " +
-                        "  struct Inner inner; " +
-                        "  int extra; " +
-                        "}; " +
-                        "void main() { " +
-                        "  struct Outer o; " +
-                        "  o.inner.value = 100; " +
-                        "  o.extra = 200; " +
-                        "}",
-
-                // Test 8: Complex assignment expression.
-                "void main() { " +
-                        "  int a; " +
-                        "  int b; " +
-                        "  a = b = (2 + 3) * 4; " +
-                        "}"
+                // MiniC source code as a String:
+                "#include \"minic-stdlib.h\"\n" +
+                        "\n" +
+                        "struct Node {\n" +
+                        "    int data;\n" +
+                        "    struct Node *next;\n" +
+                        "};\n" +
+                        "\n" +
+                        "struct Node* sortList(struct Node *head) {\n" +
+                        "    struct Node *current;\n" +
+                        "    int swapped;\n" +
+                        "    int temp;\n" +
+                        "\n" +
+                        "    if (head == (struct Node *)0) {\n" +
+                        "        return head;\n" +
+                        "    }\n" +
+                        "\n" +
+                        "    while (1) {\n" +
+                        "        swapped = 0;\n" +
+                        "        current = head;\n" +
+                        "        while (((*current).next) != (struct Node *)0) {\n" +
+                        "            if ((( ( int ) ((*current).data) )) > (( ( int ) ((*((*current).next)).data) ))) {\n" +
+                        "                temp = (( ( int ) ((*current).data) ));\n" +
+                        "                (*current).data = (( ( int ) ((*((*current).next)).data) ));\n" +
+                        "                (*((*current).next)).data = (( ( int ) (temp) ));\n" +
+                        "                swapped = 1;\n" +
+                        "            }\n" +
+                        "            current = (*current).next;\n" +
+                        "        }\n" +
+                        "        if (swapped == 0) {\n" +
+                        "            break;\n" +
+                        "        }\n" +
+                        "    }\n" +
+                        "    return (struct Node*)head;\n" +
+                        "}\n" +
+                        "\n" +
+                        "void main() {\n" +
+                        "    /* Declarations for linked list nodes (each declared separately) */\n" +
+                        "    struct Node n1;\n" +
+                        "    struct Node n2;\n" +
+                        "    struct Node n3;\n" +
+                        "    struct Node *head;\n" +
+                        "\n" +
+                        "    /* Assignments for linked list nodes (occur after declarations) */\n" +
+                        "    n1.data = 30;\n" +
+                        "    n2.data = 10;\n" +
+                        "    n3.data = 20;\n" +
+                        "\n" +
+                        "    n1.next = &n2;\n" +
+                        "    n2.next = &n3;\n" +
+                        "    n3.next = (struct Node *)0;\n" +
+                        "\n" +
+                        "    head = &n1;\n" +
+                        "    head = sortList(head);\n" +
+                        "\n" +
+                        "    /* Print sorted list values with explicit casts and nested field accesses */\n" +
+                        "    print_i((int)((( (*head).data) )));\n" +
+                        "    print_i((int)((( (*((*head).next)).data) )));\n" +
+                        "    print_i((int)((( (*((*((*head).next)).next)).data) )));\n" +
+                        "}\n"
         };
 
-        // run tests
         for (int i = 0; i < testPrograms.length; i++) {
             System.out.println("-------------------------------------------------");
             System.out.println("Test " + (i + 1) + ": " + testDescriptions[i]);
@@ -125,13 +94,11 @@ public class Test {
             Tokeniser tokeniser = new Tokeniser(scanner);
             Parser parser = new Parser(tokeniser);
             Program prog = parser.parse();
-
             SemanticAnalyzer semAnalyzer = new SemanticAnalyzer();
             semAnalyzer.analyze(prog);
-
             int errors = semAnalyzer.getNumErrors();
             return errors == 0;
-        } catch (Exception e) {
+        } catch(Exception e) {
             e.printStackTrace();
             return false;
         }

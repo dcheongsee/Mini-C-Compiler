@@ -318,6 +318,6 @@ public class Tokeniser extends CompilerPass {
     }
 
     private boolean isValidEscape(char c) {
-        return c == 'a' || c == 'b' || c == 'n' || c == 'r' || c == 't' || c == '\\' || c == '\'' || c == '"' || c == '0';
+        return c == 'a' || c == 'b' || c == 'n' || c == 'r' || c == 't' || c == 'v' || c == 'f' || c == '\\' || c == '\'' || c == '"' || c == '0';
     }
 }
