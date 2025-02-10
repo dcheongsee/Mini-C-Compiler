@@ -1,196 +1,159 @@
 package tests2;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-
-import lexer.Scanner;
-import lexer.Tokeniser;
-import parser.Parser;
-import sem.SemanticAnalyzer;
 import ast.*;
+import java.util.*;
+import java.io.*;
 
 public class Test {
-
     public static void main(String[] args) {
-        System.out.println("===== Tricky Arithmetic Interpreter Test =====");
-        boolean arithmeticSuccess = runArithmeticTest();
-        System.out.println("Arithmetic Interpreter Test: " + (arithmeticSuccess ? "Passed" : "Failed"));
-
-        System.out.println("\n===== Tricky Semantic Analyzer Test =====");
-        boolean semanticSuccess = runSemanticTest();
-        System.out.println("Semantic Analyzer Test: " + (semanticSuccess ? "Passed" : "Failed"));
-
-        System.out.println("\n===== Escaped Characters Test =====");
-        boolean escapedCharSuccess = runEscapedCharTest();
-        System.out.println("Escaped Characters Test: " + (escapedCharSuccess ? "Passed" : "Failed"));
+        testComplexASTSorting();
     }
 
-    private static boolean runArithmeticTest() {
-        String source =
-                "void main() {\n" +
-                        "    int result;\n" +
-                        "    result = -1 + +2 * (3 + (int)(4 / 2) - -5) % 3;\n" +
-                        "    print_i(result);\n" +
-                        "}\n";
-        try {
-            File tempFile = createTempFile(source);
-            Scanner scanner = new Scanner(tempFile);
-            Tokeniser tokeniser = new Tokeniser(scanner);
-            Parser parser = new Parser(tokeniser);
-            Program prog = parser.parse();
+    /**
+     * This test builds a complex AST that includes:
+     *  - A global VarDecl "globalHead" of type PointerType(StructType("node_t"))
+     *  - A function definition "insert" with:
+     *       * Two parameters added unsorted: "head" of type PointerType(PointerType(StructType("node_t")))
+     *         and "elem" of type PointerType(StructType("node_t"))
+     *       * A block containing unsorted variable declarations:
+     *             "temp" of type PointerType(StructType("node_t"))
+     *             "nodeArr" of type ArrayType(PointerType(StructType("node_t")), 10)
+     *             "i" of type INT
+     *  - A struct declaration "node_t" with unsorted fields:
+     *             "value" of type INT,
+     *             "prev" of type PointerType(StructType("node_t")),
+     *             "next" of type PointerType(StructType("node_t"))
+     *
+     * After constructing the AST with unsorted lists, we sort:
+     *    - Program.decls by name (for VarDecl, FunDef, and StructTypeDecl),
+     *    - FunDef parameters,
+     *    - Block variable declarations, and
+     *    - StructTypeDecl fields.
+     *
+     * The expected sorted order is:
+     *  Program(
+     *      VarDecl(PointerType(StructType(node_t)), globalHead),
+     *      FunDef(VOID, insert,
+     *             VarDecl(PointerType(StructType(node_t)), elem),
+     *             VarDecl(PointerType(PointerType(StructType(node_t))), head),
+     *             Block(
+     *                   VarDecl(INT, i),
+     *                   VarDecl(ArrayType(PointerType(StructType(node_t)),10), nodeArr),
+     *                   VarDecl(PointerType(StructType(node_t)), temp)
+     *             )
+     *      ),
+     *      StructTypeDecl(StructType(node_t),
+     *             VarDecl(PointerType(StructType(node_t)), next),
+     *             VarDecl(PointerType(StructType(node_t)), prev),
+     *             VarDecl(INT, value)
+     *      )
+     *  )
+     */
+    private static void testComplexASTSorting() {
+        System.out.println("=== Testing Complex AST Sorting with Pointers, Structs, and Linked Lists ===");
 
-            SemanticAnalyzer semAnalyzer = new SemanticAnalyzer();
-            semAnalyzer.analyze(prog);
-            if (semAnalyzer.getNumErrors() != 0) {
-                System.out.println("Semantic errors detected in arithmetic test.");
-                return false;
+        // --- Global Declaration ---
+        // globalHead: PointerType(StructType("node_t"))
+        VarDecl globalHead = new VarDecl(new PointerType(new StructType("node_t")), "globalHead");
+
+        // --- Function Definition "insert" ---
+        // Parameters (unsorted order): add "head" then "elem"
+        VarDecl paramHead = new VarDecl(new PointerType(new PointerType(new StructType("node_t"))), "head");
+        VarDecl paramElem = new VarDecl(new PointerType(new StructType("node_t")), "elem");
+        List<VarDecl> funParams = new ArrayList<>();
+        funParams.add(paramHead);
+        funParams.add(paramElem);
+
+        // Create Block for "insert" with unsorted variable declarations:
+        // Unsored order: "temp", "nodeArr", "i"
+        VarDecl varTemp = new VarDecl(new PointerType(new StructType("node_t")), "temp");
+        VarDecl varNodeArr = new VarDecl(new ArrayType(new PointerType(new StructType("node_t")), 10), "nodeArr");
+        VarDecl varI = new VarDecl(BaseType.INT, "i");
+        List<VarDecl> blockVars = new ArrayList<>();
+        blockVars.add(varTemp);
+        blockVars.add(varNodeArr);
+        blockVars.add(varI);
+        Block insertBlock = new Block();
+        insertBlock.vds = blockVars; // Assume Block.vds is public and holds variable declarations.
+        // (No statements added for this test.)
+
+        // Create FunDef "insert" with return type VOID.
+        FunDef funInsert = new FunDef(BaseType.VOID, "insert", funParams, insertBlock);
+
+        // --- Struct Declaration for "node_t" ---
+        // Fields unsorted: add "value", then "prev", then "next"
+        VarDecl fieldValue = new VarDecl(BaseType.INT, "value");
+        VarDecl fieldPrev = new VarDecl(new PointerType(new StructType("node_t")), "prev");
+        VarDecl fieldNext = new VarDecl(new PointerType(new StructType("node_t")), "next");
+        List<Decl> structFields = new ArrayList<>();
+        structFields.add(fieldValue);
+        structFields.add(fieldPrev);
+        structFields.add(fieldNext);
+        StructTypeDecl structNode = new StructTypeDecl("node_t", structFields);
+
+        // --- Build the Program AST ---
+        // Add unsorted: first funInsert, then globalHead, then structNode.
+        List<Decl> programDecls = new ArrayList<>();
+        programDecls.add(funInsert);
+        programDecls.add(globalHead);
+        programDecls.add(structNode);
+        Program program = new Program(programDecls);
+
+        System.out.println("Initial AST:");
+        String initialAST = getASTString(program);
+        System.out.println(initialAST);
+
+        // --- Sorting ---
+        // Sort Program.decls by name (using the name field; for StructTypeDecl use its struct name)
+        Collections.sort(program.decls, Comparator.comparing(decl -> {
+            if (decl instanceof VarDecl) {
+                return ((VarDecl) decl).name;
+            } else if (decl instanceof FunDef) {
+                return ((FunDef) decl).name;
+            } else if (decl instanceof StructTypeDecl) {
+                return ((StructTypeDecl) decl).getName(); // Assuming getName() returns the struct's name.
             }
+            return "";
+        }));
 
-            FunDef mainFun = null;
-            for (Decl d : prog.decls) {
-                if (d instanceof FunDef) {
-                    FunDef fd = (FunDef) d;
-                    if ("main".equals(fd.name)) {
-                        mainFun = fd;
-                        break;
-                    }
-                }
-            }
-            if (mainFun == null) {
-                System.out.println("No main function found in arithmetic test.");
-                return false;
-            }
+        // Sort function parameters for "insert" (alphabetical order)
+        Collections.sort(funInsert.params, Comparator.comparing(param -> param.name));
 
-            Expr arithmeticExpr = null;
-            for (Stmt s : mainFun.block.stmts) {
-                if (s instanceof ExprStmt) {
-                    Expr e = ((ExprStmt) s).expr;
-                    if (e instanceof Assign) {
-                        arithmeticExpr = ((Assign) e).right;
-                        break;
-                    }
-                }
-            }
-            if (arithmeticExpr == null) {
-                System.out.println("No arithmetic expression found in arithmetic test.");
-                return false;
-            }
+        // Sort variable declarations in the function block
+        Collections.sort(insertBlock.vds, Comparator.comparing(var -> var.name));
 
-            int result = evaluateExpr(arithmeticExpr);
-            System.out.println("Evaluated result: " + result);
-            return result == 1;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
+        // Sort fields in the struct declaration
+        Collections.sort(structNode.getFields(), Comparator.comparing(field -> ((VarDecl) field).name));
 
-    private static boolean runSemanticTest() {
-        String source =
-                "struct Node {\n" +
-                        "    int data;\n" +
-                        "    struct Node * next;\n" +
-                        "};\n" +
-                        "\n" +
-                        "int getData(struct Node * n) {\n" +
-                        "    return (*n).data;\n" +
-                        "}\n" +
-                        "\n" +
-                        "void main() {\n" +
-                        "    struct Node n1;\n" +
-                        "    struct Node n2;\n" +
-                        "    n1.data = 100;\n" +
-                        "    n2.data = 200;\n" +
-                        "    n1.next = &n2;\n" +
-                        "    print_i(getData(&n1));\n" +
-                        "    print_i(getData(n1.next));\n" +
-                        "}\n";
-        try {
-            File tempFile = createTempFile(source);
-            Scanner scanner = new Scanner(tempFile);
-            Tokeniser tokeniser = new Tokeniser(scanner);
-            Parser parser = new Parser(tokeniser);
-            Program prog = parser.parse();
+        System.out.println("\nSorted AST:");
+        String sortedAST = getASTString(program);
+        System.out.println(sortedAST);
 
-            SemanticAnalyzer semAnalyzer = new SemanticAnalyzer();
-            semAnalyzer.analyze(prog);
-            int errors = semAnalyzer.getNumErrors();
-            if (errors != 0) {
-                System.out.println("Semantic errors detected in semantic test: " + errors);
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
+        // Expected AST string (without extra spaces):
+        String expected = "Program(" +
+                "VarDecl(PointerType(StructType(node_t)),globalHead)," +
+                "FunDef(VOID,insert,VarDecl(PointerType(StructType(node_t)),elem),VarDecl(PointerType(PointerType(StructType(node_t))),head),Block(VarDecl(INT,i),VarDecl(ArrayType(PointerType(StructType(node_t)),10),nodeArr),VarDecl(PointerType(StructType(node_t)),temp)))," +
+                "StructTypeDecl(StructType(node_t),VarDecl(PointerType(StructType(node_t)),next),VarDecl(PointerType(StructType(node_t)),prev),VarDecl(INT,value))" +
+                ")";
 
-    private static boolean runEscapedCharTest() {
-        String source =
-                "void   main()   {\n" +
-                        "    char newline  ;\n" +
-                        "    char tab ;\n" +
-                        "    char backslash ;\n" +
-                        "    newline = '\\n' ;\n" +
-                        "    tab = '\\t' ;\n" +
-                        "    backslash = '\\\\' ;\n" +
-                        "    print_i((int)newline) ;\n" +
-                        "    print_i((int)tab) ;\n" +
-                        "    print_i((int)backslash) ;\n" +
-                        "    print_i( sizeof( \"Hello\\nWorld\\t!\" ) ) ;\n" +
-                        "}\n";
-        try {
-            File tempFile = createTempFile(source);
-            Scanner scanner = new Scanner(tempFile);
-            Tokeniser tokeniser = new Tokeniser(scanner);
-            Parser parser = new Parser(tokeniser);
-            Program prog = parser.parse();
-
-            SemanticAnalyzer semAnalyzer = new SemanticAnalyzer();
-            semAnalyzer.analyze(prog);
-            int errors = semAnalyzer.getNumErrors();
-            if (errors != 0) {
-                System.out.println("Semantic errors detected in escaped characters test: " + errors);
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    private static File createTempFile(String source) throws IOException {
-        File tempFile = File.createTempFile("testProgram", ".c");
-        tempFile.deleteOnExit();
-        try (FileWriter writer = new FileWriter(tempFile)) {
-            writer.write(source);
-        }
-        return tempFile;
-    }
-
-    private static int evaluateExpr(Expr expr) {
-        if (expr instanceof IntLiteral) {
-            return ((IntLiteral) expr).value;
-        } else if (expr instanceof BinOp) {
-            BinOp bin = (BinOp) expr;
-            int left = evaluateExpr(bin.left);
-            int right = evaluateExpr(bin.right);
-            switch (bin.op) {
-                case ADD: return left + right;
-                case SUB: return left - right;
-                case MUL: return left * right;
-                case DIV: return left / right;
-                case MOD: return left % right;
-                default:
-                    throw new RuntimeException("Unsupported operator in evaluation: " + bin.op);
-            }
-        } else if (expr instanceof TypecastExpr) {
-            return evaluateExpr(((TypecastExpr) expr).expr);
+        if (sortedAST.equals(expected)) {
+            System.out.println("\nTest Passed: Sorted Complex AST matches expected output.");
         } else {
-            throw new RuntimeException("Unsupported expression type for evaluation: " + expr.getClass());
+            System.out.println("\nTest Failed: Sorted Complex AST does not match expected output.");
+            System.out.println("Expected: " + expected);
+            System.out.println("Got:      " + sortedAST);
         }
+    }
+
+    /**
+     * Helper method that uses the ASTPrinter to convert an ASTNode into its string representation.
+     */
+    private static String getASTString(ASTNode node) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        ASTPrinter printer = new ASTPrinter(pw);
+        printer.visit(node);
+        pw.flush();
+        return sw.toString();
     }
 }

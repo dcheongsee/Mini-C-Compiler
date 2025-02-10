@@ -1,0 +1,1 @@
+Program(FunDef(CHAR,getNewline,Block(Return(ChrLiteral('\n')))),FunDef(CHAR,getTab,Block(Return(ChrLiteral('\t')))),FunDef(CHAR,getBackslash,Block(Return(ChrLiteral('\\')))),FunDef(CHAR,getQuote,Block(Return(ChrLiteral('\'')))),FunDef(INT,main,Block(Return(IntLiteral(0)))))

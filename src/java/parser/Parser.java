@@ -482,7 +482,7 @@ public class Parser extends CompilerPass {
                     result = new IntLiteral(Integer.parseInt(lit.data));
                     break;
                 case CHAR_LITERAL:
-                    result = new ChrLiteral(lit.data.charAt(0));
+                    result = new ChrLiteral(decodeCharLiteral(lit.data));
                     break;
                 case STRING_LITERAL:
                     result = new StrLiteral(lit.data);
@@ -505,6 +505,34 @@ public class Parser extends CompilerPass {
         return result;
     }
 
+    private char decodeCharLiteral(String s) {
+        // s is the contents of the char lit
+        if (s == null || s.isEmpty()) {
+            return '\0';
+        }
+        if (s.charAt(0) != '\\') {
+            return s.charAt(0);
+        }
+        if (s.length() < 2) {
+            return '\\';
+        }
+        char esc = s.charAt(1);
+        switch (esc) {
+            case 'a': return '\u0007';  // bell
+            case 'b': return '\b';      // backspace
+            case 'n': return '\n';      // newline
+            case 'r': return '\r';      // carriage return
+            case 't': return '\t';      // horizontal tab
+            case 'v': return '\u000B';  // vertical tab
+            case 'f': return '\f';      // form feed
+            case '\\': return '\\';     // backslash
+            case '\'': return '\'';     // single quote
+            case '"':  return '"';      // double quote
+            case '0':  return '\0';     // null
+            default:
+                return esc;
+        }
+    }
 
     private Expr parseFuncall(Token ident) {
         expect(Category.LPAR);
