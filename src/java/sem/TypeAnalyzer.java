@@ -77,7 +77,10 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			case BinOp bin -> {
 				Type leftType = visit(bin.left);
 				Type rightType = visit(bin.right);
-				if (leftType.equals(BaseType.INT) && rightType.equals(BaseType.INT)) {
+				if ((bin.op == Op.EQ || bin.op == Op.NE) && leftType.equals(rightType)
+						&& !leftType.equals(BaseType.VOID)) {
+					yield BaseType.INT;
+				} else if (leftType.equals(BaseType.INT) && rightType.equals(BaseType.INT)) {
 					yield BaseType.INT;
 				} else {
 					error("BinOp operands are not both int. Left: " + leftType + ", Right: " + rightType);
