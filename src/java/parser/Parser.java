@@ -198,16 +198,20 @@ public class Parser extends CompilerPass {
     }
 
     //  array dimensions in square brackets
-    private Type parseArrayDimensions(Type base) {
+    Type parseArrayDimensions(Type base) {
+        List<Integer> dims = new ArrayList<>();
         while (accept(Category.LSBR)) {
             expect(Category.LSBR);
             Token intToken = expect(Category.INT_LITERAL);
-            int length = Integer.parseInt(intToken.data);
+            dims.add(Integer.parseInt(intToken.data));
             expect(Category.RSBR);
-            base = new ArrayType(base, length);
+        }
+        for (int i = dims.size() - 1; i >= 0; i--) {
+            base = new ArrayType(base, dims.get(i));
         }
         return base;
     }
+
 
     // allows for 0 or more comma separated args
     private List<VarDecl> parseParameters() {

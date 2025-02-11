@@ -61,17 +61,17 @@ public class ASTPrinter {
             case ChrLiteral cl -> {
                 char c = cl.value;
                 switch (c) {
-                    case '\n': writer.print("\\n"); break;
-                    case '\t': writer.print("\\t"); break;
-                    case '\r': writer.print("\\r"); break;
-                    case '\\': writer.print("\\\\"); break;
-                    case '\'': writer.print("\\'"); break;
-                    case '\"': writer.print("\\\""); break;
-                    case '\f': writer.print("\\f"); break;
-                    case '\b': writer.print("\\b"); break;
-                    case '\u000B': writer.print("\\v"); break;
-                    case '\u0007': writer.print("\\a"); break;
-                    case '\0': writer.print("\\0"); break;
+                    case '\n': writer.print("\\\\n"); break;
+                    case '\t': writer.print("\\\\t"); break;
+                    case '\r': writer.print("\\\\r"); break;
+                    case '\\': writer.print("\\\\\\"); break;
+                    case '\'': writer.print("\\\\'"); break;
+                    case '\"': writer.print("\\\\\""); break;
+                    case '\f': writer.print("\\\\f"); break;
+                    case '\b': writer.print("\\\\b"); break;
+                    case '\u000B': writer.print("\\\\v"); break;
+                    case '\u0007': writer.print("\\\\a"); break;
+                    case '\0': writer.print("\\\\0"); break;
                     default:
                         // if char is printable, just print it
                         writer.print(c);
