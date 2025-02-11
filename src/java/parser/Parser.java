@@ -534,6 +534,7 @@ public class Parser extends CompilerPass {
         }
     }
 
+
     private Expr parseFuncall(Token ident) {
         expect(Category.LPAR);
         List<Expr> args = new ArrayList<>();

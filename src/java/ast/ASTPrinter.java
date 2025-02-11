@@ -59,7 +59,6 @@ public class ASTPrinter {
             }
 
             case ChrLiteral cl -> {
-                writer.print("'");
                 char c = cl.value;
                 switch (c) {
                     case '\n': writer.print("\\n"); break;
@@ -78,7 +77,6 @@ public class ASTPrinter {
                         writer.print(c);
                         break;
                 }
-                writer.print("'");
             }
 
             case IntLiteral il -> {

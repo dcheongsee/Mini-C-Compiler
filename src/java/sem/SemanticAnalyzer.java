@@ -7,7 +7,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SemanticAnalyzer extends CompilerPass {
-	
+
+	private TypeAnalyzer typeAnalyzer;
+
 	public void analyze(ast.Program prog) {
 
 		prog.decls.addAll(
@@ -29,11 +31,11 @@ public class SemanticAnalyzer extends CompilerPass {
 		ll.visit(prog, false);
 		this.numErrors += ll.getNumErrors();
 
-		TypeAnalyzer tc = new TypeAnalyzer();
-		tc.visit(prog);
-		this.numErrors += tc.getNumErrors();
+		typeAnalyzer = new TypeAnalyzer();
+		typeAnalyzer.visit(prog);
+		this.numErrors += typeAnalyzer.getNumErrors();
 
-		ReturnChecker rc = new ReturnChecker();
+		ReturnChecker rc = new ReturnChecker(typeAnalyzer);
 		rc.visit(prog);
 		this.numErrors += rc.getNumErrors();
 	}
@@ -109,6 +111,13 @@ public class SemanticAnalyzer extends CompilerPass {
 
 
 	private class ReturnChecker extends CompilerPass {
+
+		private final TypeAnalyzer ta;
+
+		public ReturnChecker(TypeAnalyzer ta) {
+			this.ta = ta;
+		}
+
 		public void visit(ASTNode node) {
 			if (node == null) return;
 
@@ -134,7 +143,6 @@ public class SemanticAnalyzer extends CompilerPass {
 					if (ret.expr == null) {
 						SemanticAnalyzer.this.error("Non-void function must return a value.");
 					} else {
-						TypeAnalyzer ta = new TypeAnalyzer();
 						Type retType = ta.visit(ret.expr);
 						if (!retType.equals(expected)) {
 							SemanticAnalyzer.this.error("Return expression type " + retType + " does not match declared type " + expected + ".");
