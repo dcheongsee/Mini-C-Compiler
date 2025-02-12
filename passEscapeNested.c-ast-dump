@@ -1,1 +1,3 @@
-Program(FunDef(INT,main,Block(VarDecl(CHAR,a),ExprStmt(Assign(VarExpr(a),BinOp(BinOp(BinOp(BinOp(ChrLiteral(\\n),ADD,ChrLiteral(\t)),MUL,ChrLiteral(\r)),SUB,BinOp(ChrLiteral(\\),SUB,ChrLiteral(\'))),ADD,ChrLiteral(\")))),Return(VarExpr(a)))))
+Program(FunDef(INT,main,Block(VarDecl(CHAR,a),ExprStmt(Assign(VarExpr(a),BinOp(BinOp(BinOp(BinOp(ChrLiteral(
+),ADD,ChrLiteral(	)),MUL,ChrLiteral(
+)),SUB,BinOp(ChrLiteral(\),SUB,ChrLiteral('))),ADD,ChrLiteral(")))),Return(VarExpr(a)))))

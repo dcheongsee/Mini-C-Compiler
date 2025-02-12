@@ -216,7 +216,7 @@ public class Tokeniser extends CompilerPass {
                         if (scanner.hasNext()) {
                             char escapeChar = scanner.next();
                             if (isValidEscape(escapeChar)) {
-                                sb.append('\\').append(escapeChar);
+                                sb.append(decodeEscape(escapeChar));
                             } else {
                                 error(escapeChar, scanner.getLine(), scanner.getColumn());
                                 return new Token(Token.Category.INVALID, startLine, startCol);
@@ -320,4 +320,23 @@ public class Tokeniser extends CompilerPass {
     private boolean isValidEscape(char c) {
         return c == 'a' || c == 'b' || c == 'n' || c == 'r' || c == 't' || c == 'v' || c == 'f' || c == '\\' || c == '\'' || c == '"' || c == '0';
     }
+
+    private char decodeEscape(char c) {
+        switch (c) {
+            case 'n': return '\n';
+            case 't': return '\t';
+            case 'b': return '\b';
+            case 'r': return '\r';
+            case 'f': return '\f';
+            case 'a': return '\u0007';  // bell
+            case 'v': return '\u000B';  // vertical tab
+            case '\\': return '\\';
+            case '\'': return '\'';
+            case '"':  return '"';
+            case '0':  return '\0';
+            default:
+                return c;
+        }
+    }
+
 }

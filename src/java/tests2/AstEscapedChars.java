@@ -6,7 +6,7 @@ import java.util.List;
 
 public class AstEscapedChars {
     public static void main(String[] args) {
-        StrLiteral strLit = new StrLiteral("Hello\\nWorld");
+        StrLiteral strLit = new StrLiteral("Hello\nWorld");
         ChrLiteral chrLit = new ChrLiteral('\\');
         ExprStmt exprStmt1 = new ExprStmt(strLit);
         ExprStmt exprStmt2 = new ExprStmt(chrLit);
