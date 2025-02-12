@@ -499,13 +499,14 @@ public class Parser extends CompilerPass {
         }
 
         // after parsing any primary, check for field accesses
-        while (accept(Category.DOT)) {
-            result = parseFieldAccess(result);
+        while (accept(Category.DOT) || accept(Category.LSBR)) {
+            if (accept(Category.DOT)) {
+                result = parseFieldAccess(result);
+            } else if (accept(Category.LSBR)) {
+                result = parseArrayAccess(result);
+            }
         }
-        // after field accesses, check for array accesses
-        while (accept(Category.LSBR)) {
-            result = parseArrayAccess(result);
-        }
+
         return result;
     }
 
