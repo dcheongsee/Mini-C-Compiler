@@ -12,16 +12,19 @@ public class SemanticAnalyzer extends CompilerPass {
 
 	public void analyze(ast.Program prog) {
 
-		prog.decls.addAll(
-				Stream.of(
-						new FunDecl(BaseType.INT, "read_i", List.of()),
-						new FunDecl(BaseType.VOID, "print_c", List.of(new VarDecl(BaseType.CHAR, "c"))),
-						new FunDecl(BaseType.CHAR, "read_c", List.of()),
-						new FunDecl(BaseType.VOID, "mcmalloc", List.of(new VarDecl(BaseType.INT, "size"))),
-						new FunDecl(BaseType.VOID, "print_s", List.of(new VarDecl(new PointerType(BaseType.CHAR), "s"))),
-						new FunDecl(BaseType.VOID, "print_i", List.of(new VarDecl(BaseType.INT, "i")))
-				).collect(Collectors.toList())
-		);
+		for (FunDecl builtin : List.of(
+				new FunDecl(BaseType.INT, "read_i", List.of()),
+				new FunDecl(BaseType.VOID, "print_c", List.of(new VarDecl(BaseType.CHAR, "c"))),
+				new FunDecl(BaseType.CHAR, "read_c", List.of()),
+				new FunDecl(BaseType.VOID, "mcmalloc", List.of(new VarDecl(BaseType.INT, "size"))),
+				new FunDecl(BaseType.VOID, "print_s", List.of(new VarDecl(new PointerType(BaseType.CHAR), "s"))),
+				new FunDecl(BaseType.VOID, "print_i", List.of(new VarDecl(BaseType.INT, "i")))
+		))
+		{
+			if (!alreadyDeclared(prog, builtin.name)) {
+				prog.decls.add(builtin);
+			}
+		}
 
 		NameAnalyzer na = new NameAnalyzer();
 		na.visit(prog);
@@ -158,5 +161,15 @@ public class SemanticAnalyzer extends CompilerPass {
 			}
 		}
 	}
+
+	private boolean alreadyDeclared(Program prog, String funName) {
+		for (Decl d : prog.decls) {
+			if ((d instanceof FunDecl || d instanceof FunDef) && d.name.equals(funName)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 
 }

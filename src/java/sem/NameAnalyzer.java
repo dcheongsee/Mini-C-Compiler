@@ -23,13 +23,16 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 			}
 
 			case FunDecl fd -> {
-				// check duplicate func decl in current scope
-				if (currentScope.lookupCurrent(fd.name) != null) {
+				Symbol existingSym = currentScope.lookupCurrent(fd.name);
+				if (existingSym != null) {
+					// another function symbol with same name in same scope => error
 					error("Function declaration " + fd.name + " is already declared in this scope.");
 				} else {
+					// insert new function symbol
 					currentScope.put(new FunctionSymbol(fd.name, fd));
 				}
 
+				// scope for parameters
 				Scope prev = currentScope;
 				currentScope = new Scope(prev);
 				for (VarDecl param : fd.params) {
@@ -39,13 +42,20 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 			}
 
 			case FunDef fd -> {
-				// check duplicate func def in current scope
-				if (currentScope.lookupCurrent(fd.name) != null) {
-					error("Function definition " + fd.name + " is already declared in this scope.");
-				} else {
+				Symbol existingSym = currentScope.lookupCurrent(fd.name);
+				if (existingSym == null) {
 					currentScope.put(new FunctionSymbol(fd.name, fd));
+				} else if (existingSym instanceof FunctionSymbol fs) {
+					if (fs.decl instanceof FunDecl oldDecl) {
+						fs.decl = fd;
+					} else {
+						error("Function definition " + fd.name + " is already declared in this scope.");
+					}
+				} else {
+					error("Identifier " + fd.name + " does not refer to a function.");
 				}
 
+				// handle the parameters in a new scope
 				Scope prev = currentScope;
 				currentScope = new Scope(prev);
 				for (VarDecl param : fd.params) {
