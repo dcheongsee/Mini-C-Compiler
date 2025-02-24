@@ -128,9 +128,9 @@ struct S3 {
   struct S1 s;
   char c2; 
 }
-struct S2 {
+struct S4 {
   char c1;
-  struct S1 s;
+  struct S2 s;
   char c2; 
 }
 ```
