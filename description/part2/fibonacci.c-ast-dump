@@ -1,5 +1,5 @@
 Program(
-  FunDecl(VOID,main
+  FunDef(VOID,main
          ,Block(VarDecl(INT,n)
                ,VarDecl(INT,first)
                ,VarDecl(INT,second)
