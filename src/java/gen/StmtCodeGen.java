@@ -19,6 +19,7 @@ public class StmtCodeGen extends CodeGen {
                 });
             }
             // To complete other cases
+            default -> {} //added placeholder default to remove error
         }
     }
 }
