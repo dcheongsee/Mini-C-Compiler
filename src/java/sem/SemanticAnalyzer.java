@@ -9,9 +9,10 @@ import java.util.stream.Stream;
 public class SemanticAnalyzer extends CompilerPass {
 
 	private TypeAnalyzer typeAnalyzer;
+	public static Program GlobalAST;
 
 	public void analyze(ast.Program prog) {
-
+		GlobalAST = prog;
 		for (FunDecl builtin : List.of(
 				new FunDecl(BaseType.INT, "read_i", List.of()),
 				new FunDecl(BaseType.VOID, "print_c", List.of(new VarDecl(BaseType.CHAR, "c"))),

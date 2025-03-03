@@ -55,9 +55,12 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			case VarExpr v -> {
 				if (v.vd == null) {
 					error("Variable " + v.name + " is not linked to any declaration.");
+					v.type = BaseType.UNKNOWN;
 					yield BaseType.UNKNOWN;
 				} else {
-					yield visit(v.vd);
+					Type t = visit(v.vd);
+					v.type = t;
+					yield t;
 				}
 			}
 			case StructTypeDecl std -> {
@@ -121,12 +124,15 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				Type indexType = visit(aa.index);
 				if (!indexType.equals(BaseType.INT)) {
 					error("Array index is not an int.");
+					aa.type = BaseType.UNKNOWN;
 					yield BaseType.UNKNOWN;
 				}
 				if (arrayType instanceof ArrayType at) {
+					aa.type = at.elementType;
 					yield at.elementType;
 				} else {
 					error("Array access on a non-array type.");
+					aa.type = BaseType.UNKNOWN;
 					yield BaseType.UNKNOWN;
 				}
 			}
@@ -211,6 +217,7 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					StructTypeDecl decl = lookupStructDecl(st.name);
 					if (decl == null) {
 						error("No declaration found for struct " + st.name);
+						fa.type = BaseType.UNKNOWN;
 						yield BaseType.UNKNOWN;
 					}
 					Type fieldType = null;
@@ -222,15 +229,19 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					}
 					if (fieldType == null) {
 						error("Unknown field " + fa.field + " in struct " + st.name);
+						fa.type = BaseType.UNKNOWN;
 						yield BaseType.UNKNOWN;
 					} else {
+						fa.type = fieldType;
 						yield fieldType;
 					}
 				} else {
 					error("Field access on non-struct type.");
+					fa.type = BaseType.UNKNOWN;
 					yield BaseType.UNKNOWN;
 				}
 			}
+
 
 			case IntLiteral il -> BaseType.INT;
 			case ChrLiteral cl -> BaseType.CHAR;

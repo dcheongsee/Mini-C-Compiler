@@ -6,6 +6,7 @@ import java.util.List;
 public final class FunDef extends Decl {
     public final List<VarDecl> params;
     public final Block block;
+    public int localVarSize;
 
     public FunDef(Type type, String name, List<VarDecl> params, Block block) {
         this.type = type;
