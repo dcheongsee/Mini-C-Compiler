@@ -1,6 +1,8 @@
 java.lang.Throwable:
-gen.ExprValCodeGen.computeAddress(ExprValCodeGen.java:256)
-gen.ExprValCodeGen.visit(ExprValCodeGen.java:104)
+gen.ExprAddrCodeGen.getFieldOffset(ExprAddrCodeGen.java:204)
+gen.ExprAddrCodeGen.visit(ExprAddrCodeGen.java:97)
+gen.ExprValCodeGen.visit(ExprValCodeGen.java:91)
+gen.ExprValCodeGen.visit(ExprValCodeGen.java:127)
 gen.StmtCodeGen.visit(StmtCodeGen.java:32)
 gen.StmtCodeGen.visit(StmtCodeGen.java:28)
 gen.FunCodeGen.visit(FunCodeGen.java:49)

@@ -5,6 +5,7 @@ import gen.asm.AssemblyProgram;
 import gen.asm.Label;
 import gen.asm.OpCode;
 import gen.asm.Register;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,8 +14,7 @@ import java.util.Map;
  */
 public class ExprAddrCodeGen extends CodeGen {
 
-    // mapping of struct names to their decl
-    private Map<String, StructTypeDecl> structDecls;
+    private final Map<String, StructTypeDecl> structDecls;
     private final ASTNode astRoot;
 
     public ExprAddrCodeGen(AssemblyProgram asmProg, ASTNode astRoot) {
@@ -23,7 +23,6 @@ public class ExprAddrCodeGen extends CodeGen {
         this.structDecls = collectStructDecls(astRoot);
     }
 
-    // recursively collect struct decl
     private Map<String, StructTypeDecl> collectStructDecls(ASTNode node) {
         Map<String, StructTypeDecl> map = new HashMap<>();
         collect(node, map);
@@ -39,51 +38,83 @@ public class ExprAddrCodeGen extends CodeGen {
         }
     }
 
+
     public Register visit(Expr e) {
-        switch (e) {
-            case VarExpr v -> {
-                VarDecl vd = v.vd;
-                Register r = Register.Virtual.create();
-                if (vd.globalLabel != null) {
-                    asmProg.getCurrentTextSection().emit(OpCode.LA, r, Label.get(vd.globalLabel));
-                } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, r, Register.Arch.fp, vd.offset);
-                }
-                return r;
-            }
-            case ArrayAccessExpr aa -> {
-                Register base = visit(aa.array);
-                Register index = new ExprValCodeGen(asmProg, astRoot).visit(aa.index);
-                int elemSize;
-                if (aa.array.type instanceof ArrayType at) {
-                    elemSize = getSize(at.elementType);
-                } else {
-                    throw new RuntimeException("ArrayAccess on non-array type");
-                }
-                Register immReg = Register.Virtual.create();
-                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, immReg, Register.Arch.zero, elemSize);
-                Register offsetReg = Register.Virtual.create();
-                asmProg.getCurrentTextSection().emit(OpCode.MUL, offsetReg, index, immReg);
-                Register addr = Register.Virtual.create();
-                asmProg.getCurrentTextSection().emit(OpCode.ADD, addr, base, offsetReg);
-                return addr;
-            }
-            case FieldAccessExpr fa -> {
-                Register base = visit(fa.expr);
-                int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
-                Register addr = Register.Virtual.create();
-                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addr, base, fieldOffset);
-                return addr;
-            }
-            case AddressOfExpr ao -> {
-                return visit(ao.expr);
-            }
-            case ValueAtExpr va -> {
-                return new ExprValCodeGen(asmProg, astRoot).visit(va.expr);
-            }
-            case null, default ->
-                    throw new RuntimeException("Expression is not an lvalue: " + e.getClass().getSimpleName());
+        if (e == null) {
+            throw new RuntimeException("ExprAddrCodeGen: null expression encountered.");
         }
+        return switch (e) {
+
+            // VarExpr, either global or local
+            case VarExpr v -> {
+                VarDecl vd = v.vd;  // NameAnalyzer should have set this
+                if (vd == null) {
+                    throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
+                }
+                Register addrReg = Register.Virtual.create();
+                if (vd.globalLabel != null) {
+                    // global var, la  addrReg, globalLabel
+                    asmProg.getCurrentTextSection().emit(OpCode.LA, addrReg, Label.get(vd.globalLabel));
+                } else {
+                    // local, offset from $fp
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addrReg, Register.Arch.fp, vd.offset);
+                }
+                yield addrReg;
+            }
+
+            // ArrayAccess, base address + (index * elemSize)
+            case ArrayAccessExpr aa -> {
+                // get base address
+                Register baseAddr = visit(aa.array);
+
+                // compute index’s value with ExprValCodeGen
+                Register indexVal = new ExprValCodeGen(asmProg, astRoot).visit(aa.index);
+
+                int elemSize = getSizeOfArrayElement(aa.array.type);
+                Register sizeReg = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.LI, sizeReg, elemSize);
+
+                Register offsetReg = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.MUL, offsetReg, indexVal, sizeReg);
+
+                // final address = base + offset
+                Register finalAddr = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.ADD, finalAddr, baseAddr, offsetReg);
+                yield finalAddr;
+            }
+
+            // FieldAccess, struct base + offset of field
+            case FieldAccessExpr fa -> {
+                Register baseAddr = visit(fa.expr);
+                int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                Register finalAddr = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, baseAddr, fieldOffset);
+                yield finalAddr;
+            }
+
+            // ValueAt, address is the pointer's value
+            case ValueAtExpr va -> {
+                Register pointerVal = new ExprValCodeGen(asmProg, astRoot).visit(va.expr);
+                yield pointerVal; // that pointerVal is the address
+            }
+
+            // AddressOf, address of e, just call visit(e) because e must be an lvalue
+            case AddressOfExpr ao -> {
+                yield visit(ao.expr);
+            }
+
+            default -> throw new RuntimeException(
+                    "Expression type " + e.getClass().getSimpleName()
+                            + " is not an lvalue and does not have an address."
+            );
+        };
+    }
+
+    private int getSizeOfArrayElement(Type arrayType) {
+        if (arrayType instanceof ArrayType at) {
+            return getSize(at.elementType);
+        }
+        throw new RuntimeException("getSizeOfArrayElement called on non-array type");
     }
 
     private int getSize(Type type) {
@@ -99,15 +130,19 @@ public class ExprAddrCodeGen extends CodeGen {
             return getSize(at.elementType) * at.length;
         } else if (type instanceof StructType st) {
             StructTypeDecl decl = structDecls.get(st.name);
-            if (decl == null) throw new RuntimeException("Struct not found: " + st.name);
+            if (decl == null) {
+                throw new RuntimeException("Unknown struct " + st.name);
+            }
             return computeStructSize(decl);
         }
         return 0;
     }
 
-    private int computeStructSize(StructTypeDecl decl) {
-        int offset = 0, maxAlign = 1;
-        for (Decl field : decl.getFields()) {
+    // calculates total size of a struct with alignment
+    private int computeStructSize(StructTypeDecl std) {
+        int offset = 0;
+        int maxAlign = 1;
+        for (Decl field : std.getFields()) {
             if (field instanceof VarDecl vd) {
                 int size = getSize(vd.type);
                 int align = getAlignment(vd.type);
@@ -116,9 +151,11 @@ public class ExprAddrCodeGen extends CodeGen {
                 if (align > maxAlign) maxAlign = align;
             }
         }
-        return alignTo(offset, maxAlign);
+        offset = alignTo(offset, maxAlign);
+        return offset;
     }
 
+    // compute alignment
     private int getAlignment(Type type) {
         if (type instanceof BaseType bt) {
             return switch (bt) {
@@ -132,13 +169,12 @@ public class ExprAddrCodeGen extends CodeGen {
             return getAlignment(at.elementType);
         } else if (type instanceof StructType st) {
             StructTypeDecl decl = structDecls.get(st.name);
+            if (decl == null) return 1;
             int maxAlign = 1;
-            if (decl != null) {
-                for (Decl field : decl.getFields()) {
-                    if (field instanceof VarDecl vd) {
-                        int align = getAlignment(vd.type);
-                        if (align > maxAlign) maxAlign = align;
-                    }
+            for (Decl f : decl.getFields()) {
+                if (f instanceof VarDecl vd) {
+                    int align = getAlignment(vd.type);
+                    if (align > maxAlign) maxAlign = align;
                 }
             }
             return maxAlign;
@@ -147,26 +183,33 @@ public class ExprAddrCodeGen extends CodeGen {
     }
 
     private int alignTo(int value, int alignment) {
-        if (alignment == 0) return value;
+        if (alignment <= 1) return value;
         return ((value + alignment - 1) / alignment) * alignment;
     }
 
     private int getFieldOffset(Type structType, String fieldName) {
-        if (!(structType instanceof StructType st))
-            throw new RuntimeException("Not a struct type");
+        if (!(structType instanceof StructType st)) {
+            throw new RuntimeException("Field access on non-struct type");
+        }
         StructTypeDecl decl = structDecls.get(st.name);
-        if (decl == null) throw new RuntimeException("Struct declaration not found for " + st.name);
+        if (decl == null) {
+            throw new RuntimeException("Struct " + st.name + " not found");
+        }
         int offset = 0;
+        int maxAlign = 1;
         for (Decl d : decl.getFields()) {
             if (d instanceof VarDecl vd) {
                 int size = getSize(vd.type);
                 int align = getAlignment(vd.type);
                 offset = alignTo(offset, align);
-                if (vd.name.equals(fieldName))
+                if (vd.name.equals(fieldName)) {
                     return offset;
+                }
                 offset += size;
+                if (align > maxAlign) maxAlign = align;
             }
         }
         throw new RuntimeException("Field " + fieldName + " not found in struct " + st.name);
     }
+
 }

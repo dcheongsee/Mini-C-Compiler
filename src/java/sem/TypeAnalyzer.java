@@ -113,12 +113,15 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			case ValueAtExpr va -> {
 				Type t = visit(va.expr);
 				if (t instanceof PointerType pt) {
+					va.type = pt.base;
 					yield pt.base;
 				} else {
 					error("ValueAtExpr applied to non-pointer type.");
+					va.type = BaseType.UNKNOWN;
 					yield BaseType.UNKNOWN;
 				}
 			}
+
 			case ArrayAccessExpr aa -> {
 				Type arrayType = visit(aa.array);
 				Type indexType = visit(aa.index);

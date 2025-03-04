@@ -18,9 +18,19 @@ global_i:
 .align 2
 .space 4
 # Allocated labels for virtual registers
+label_12_v0:
+.space 4
 label_13_v2:
 .space 4
-label_16_v4:
+label_33_v13:
+.space 4
+label_35_v14:
+.space 4
+label_19_v5:
+.space 4
+label_28_v10:
+.space 4
+label_21_v6:
 .space 4
 label_23_v7:
 .space 4
@@ -28,25 +38,15 @@ label_32_v12:
 .space 4
 label_25_v8:
 .space 4
-label_26_v9:
-.space 4
-label_35_v14:
-.space 4
-label_10_v1:
-.space 4
-label_28_v10:
-.space 4
-label_33_v13:
-.space 4
-label_12_v0:
-.space 4
-label_19_v5:
+label_30_v11:
 .space 4
 label_18_v3:
 .space 4
-label_21_v6:
+label_10_v1:
 .space 4
-label_30_v11:
+label_16_v4:
+.space 4
+label_26_v9:
 .space 4
 
 .text

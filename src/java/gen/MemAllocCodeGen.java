@@ -137,11 +137,12 @@ public class MemAllocCodeGen extends CodeGen {
                 int size = getSize(vd.type);
                 String label = "global_" + vd.name;
                 vd.globalLabel = label;
-                asmProg.dataSection.emit(Label.get(label));
-                // emit alignment directive to ensure word alignment 2^2=4
+                // first align then emit label so it points to actual start of allocated space
                 asmProg.dataSection.emit(new Directive("align 2"));
+                asmProg.dataSection.emit(Label.get(label));
                 asmProg.dataSection.emit(new Directive("space " + size));
             }
+
 
             return;
         }
