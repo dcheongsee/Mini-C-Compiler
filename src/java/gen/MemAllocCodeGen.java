@@ -5,7 +5,9 @@ import gen.asm.AssemblyProgram;
 import gen.asm.Label;
 import gen.asm.Directive;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /* This allocator should deal with all global and local variable declarations. */
 
@@ -13,6 +15,7 @@ public class MemAllocCodeGen extends CodeGen {
 
     // mapping of struct names to their decl
     private Map<String, StructTypeDecl> structDecls = new HashMap<>();
+    private final Set<String> emittedGlobals = new HashSet<>();
 
     public MemAllocCodeGen(AssemblyProgram asmProg) {
         this.asmProg = asmProg;
@@ -94,12 +97,32 @@ public class MemAllocCodeGen extends CodeGen {
     }
 
     public void visit(ASTNode n) {
+        // for the Program node, process its decls only.
+        if (n instanceof Program p) {
+            for (Decl d : p.decls) {
+                if (d instanceof StructTypeDecl) {
+                    structDecls.put(((StructTypeDecl) d).getName(), (StructTypeDecl) d);
+                } else {
+                    visit(d, false);
+                }
+            }
+            return;
+        }
+        visit(n, false);
+    }
+
+    private void visit(ASTNode n, boolean inStruct) {
         if (n == null) return;
+
         if (n instanceof StructTypeDecl std) {
             structDecls.put(std.getName(), std);
+            for (ASTNode child : n.children()) {
+                visit(child, true);
+            }
+            return;
         }
+
         if (n instanceof FunDef fd) {
-            // process func params
             boolean oldGlobal = global;
             global = false;
             int paramOffset = 8;
@@ -108,46 +131,55 @@ public class MemAllocCodeGen extends CodeGen {
                 int align = getAlignment(p.type);
                 paramOffset = alignTo(paramOffset, align);
                 p.offset = paramOffset;
+                p.isParameter = true;
                 paramOffset += size;
             }
+
             int savedFp = fpOffset;
             fpOffset = 8;
-            visit(fd.block);
+            visit(fd.block, false);
             fd.localVarSize = fpOffset;
             fpOffset = savedFp;
             global = oldGlobal;
             return;
         }
+
         if (n instanceof Block b) {
-            // allocate local var in this block
             for (VarDecl vd : b.vds) {
                 int size = getSize(vd.type);
                 int align = getAlignment(vd.type);
                 fpOffset = alignTo(fpOffset, align);
                 fpOffset += size;
-                vd.offset = -fpOffset; // locals are at negative offsets relative to $fp
+                vd.offset = -fpOffset;
             }
             for (ASTNode child : b.children()) {
-                visit(child);
+                visit(child, false);
             }
             return;
         }
+
         if (n instanceof VarDecl vd) {
+            // if we're inside a struct decl, skip global allocation
+            if (inStruct) return;
             if (global) {
-                int size = getSize(vd.type);
                 String label = "global_" + vd.name;
+                // check if global label was already emitted
+                if (emittedGlobals.contains(label))
+                    return;
+                emittedGlobals.add(label);
                 vd.globalLabel = label;
-                // first align then emit label so it points to actual start of allocated space
+                int size = getSize(vd.type);
                 asmProg.dataSection.emit(new Directive("align 2"));
                 asmProg.dataSection.emit(Label.get(label));
                 asmProg.dataSection.emit(new Directive("space " + size));
             }
-
-
             return;
         }
+
         for (ASTNode child : n.children()) {
-            visit(child);
+            visit(child, inStruct);
         }
     }
+
+
 }

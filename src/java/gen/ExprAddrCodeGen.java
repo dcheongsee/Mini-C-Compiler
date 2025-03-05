@@ -53,14 +53,16 @@ public class ExprAddrCodeGen extends CodeGen {
                 }
                 Register addrReg = Register.Virtual.create();
                 if (vd.globalLabel != null) {
-                    // global var, la  addrReg, globalLabel
                     asmProg.getCurrentTextSection().emit(OpCode.LA, addrReg, Label.get(vd.globalLabel));
+                } else if (vd.isParameter) {
+                    // for params, load pointer from fp+offset
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, addrReg, Register.Arch.fp, vd.offset);
                 } else {
-                    // local, offset from $fp
                     asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addrReg, Register.Arch.fp, vd.offset);
                 }
                 yield addrReg;
             }
+
 
             // ArrayAccess, base address + (index * elemSize)
             case ArrayAccessExpr aa -> {
@@ -113,9 +115,12 @@ public class ExprAddrCodeGen extends CodeGen {
     private int getSizeOfArrayElement(Type arrayType) {
         if (arrayType instanceof ArrayType at) {
             return getSize(at.elementType);
+        } else if (arrayType instanceof PointerType pt) {
+            return getSize(pt.base);
         }
         throw new RuntimeException("getSizeOfArrayElement called on non-array type");
     }
+
 
     private int getSize(Type type) {
         if (type instanceof BaseType bt) {

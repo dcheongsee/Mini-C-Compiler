@@ -18,6 +18,8 @@ public class ExprValCodeGen extends CodeGen {
     private final Map<String, StructTypeDecl> structDecls;
     private final ASTNode astRoot;
     private final ExprAddrCodeGen addrGen;
+    private static final Map<String, Label> emittedStrings = new HashMap<>();
+
 
     public ExprValCodeGen(AssemblyProgram asmProg, ASTNode astRoot) {
         this.asmProg = asmProg;
@@ -50,6 +52,15 @@ public class ExprValCodeGen extends CodeGen {
         return switch (e) {
             // VarExpr, get address from addrGen, load LB/LW
             case VarExpr v -> {
+                VarDecl vd = v.vd;
+                if (vd == null) {
+                    throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
+                }
+                // if the var's type is array, perform decay conversion
+                if (vd.type instanceof ArrayType) {
+                    yield addrGen.visit(v);
+                }
+                // otherwise load value
                 Register addr = addrGen.visit(v);
                 Register result = Register.Virtual.create();
                 if (isCharType(v.vd.type)) {
@@ -59,6 +70,7 @@ public class ExprValCodeGen extends CodeGen {
                 }
                 yield result;
             }
+
 
             // ArrayAccess, address, load
             case ArrayAccessExpr aa -> {
@@ -116,18 +128,25 @@ public class ExprValCodeGen extends CodeGen {
 
             // Assign, evaluate RHS, compute LHS address, then store
             case Assign assign -> {
-                Register rhsVal = visit(assign.right);
-                Register lhsAddr = addrGen.visit(assign.left);
-
-                // store
-                if (isCharType(assign.left.type)) {
-                    asmProg.getCurrentTextSection().emit(OpCode.SB, rhsVal, lhsAddr, 0);
+                if (assign.left.type instanceof StructType) {
+                    int structSize = getSize(assign.left.type);
+                    Register rhsVal = visit(assign.right);
+                    Register lhsAddr = addrGen.visit(assign.left);
+                    emitStructCopy(rhsVal, lhsAddr, structSize);
+                    // value of assignment expr is the RHS pointer
+                    yield rhsVal;
                 } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.SW, rhsVal, lhsAddr, 0);
+                    Register rhsVal = visit(assign.right);
+                    Register lhsAddr = addrGen.visit(assign.left);
+                    if (isCharType(assign.left.type)) {
+                        asmProg.getCurrentTextSection().emit(OpCode.SB, rhsVal, lhsAddr, 0);
+                    } else {
+                        asmProg.getCurrentTextSection().emit(OpCode.SW, rhsVal, lhsAddr, 0);
+                    }
+                    yield rhsVal;
                 }
-                // value of the assignment expression is the RHS
-                yield rhsVal;
             }
+
 
             // BinOp, evaluate left & right, apply MIPS op, result
             case BinOp bin -> {
@@ -210,11 +229,18 @@ public class ExprValCodeGen extends CodeGen {
 
             // StrLiteral, create a label in .data, la, reg
             case StrLiteral sl -> {
-                String labelName = "str_" + Integer.toUnsignedString(sl.value.hashCode());
-                Label lbl = Label.get(labelName);
-                String fixed = escapeString(sl.value); // esc chars
-                asmProg.dataSection.emit(lbl);
-                asmProg.dataSection.emit(new gen.asm.Directive("asciiz \"" + fixed + "\""));
+                String text = sl.value;
+                Label lbl;
+                if (emittedStrings.containsKey(text)) {
+                    lbl = emittedStrings.get(text);
+                } else {
+                    String labelName = "str_" + Integer.toUnsignedString(text.hashCode());
+                    lbl = Label.get(labelName);
+                    emittedStrings.put(text, lbl);
+                    String fixed = escapeString(text);
+                    asmProg.dataSection.emit(lbl);
+                    asmProg.dataSection.emit(new gen.asm.Directive("asciiz \"" + fixed + "\""));
+                }
                 Register result = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.LA, result, lbl);
                 yield result;
@@ -231,21 +257,30 @@ public class ExprValCodeGen extends CodeGen {
                 if (isBuiltin(fc.name)) {
                     yield handleBuiltinCall(fc);
                 } else {
-                    // push arguments in reverse
+                    boolean structReturn = isStructReturn(fc);
+                    int extraArgs = structReturn ? 1 : 0;
+                    if (structReturn) {
+                        int structSize = getSize(getReturnType(fc));
+                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -structSize);
+                        asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.a0, Register.Arch.sp, Register.Arch.zero);
+                    }
                     for (int i = fc.args.size() - 1; i >= 0; i--) {
                         Register argVal = visit(fc.args.get(i));
                         asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
                         asmProg.getCurrentTextSection().emit(OpCode.SW, argVal, Register.Arch.sp, 0);
                     }
-                    // call
                     asmProg.getCurrentTextSection().emit(OpCode.JAL, Label.get(fc.name));
-                    // pop
-                    int stackAdj = fc.args.size() * 4;
+                    // pop the pushed args including the hidden one if any
+                    int stackAdj = (fc.args.size() + extraArgs) * 4;
                     asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, stackAdj);
 
-                    // move v0, result
                     Register result = Register.Virtual.create();
-                    asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.v0, Register.Arch.zero);
+                    if (structReturn) {
+                        // for struct returns, the hidden pointer (in $a0) is the result
+                        asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.a0, Register.Arch.zero);
+                    } else {
+                        asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.v0, Register.Arch.zero);
+                    }
                     yield result;
                 }
             }
@@ -455,6 +490,47 @@ public class ExprValCodeGen extends CodeGen {
             }
         }
         return sb.toString();
+    }
+
+    private void emitStructCopy(Register src, Register dest, int size) {
+        // copy word by word
+        int words = size / 4;
+        int remainder = size % 4;
+        for (int i = 0; i < words; i++) {
+            Register temp = Register.Virtual.create();
+            asmProg.getCurrentTextSection().emit(OpCode.LW, temp, src, i * 4);
+            asmProg.getCurrentTextSection().emit(OpCode.SW, temp, dest, i * 4);
+        }
+        // if struct size is not a multiple of 4 copy remaining bytes
+        for (int i = words * 4; i < size; i++) {
+            Register temp = Register.Virtual.create();
+            asmProg.getCurrentTextSection().emit(OpCode.LB, temp, src, i);
+            asmProg.getCurrentTextSection().emit(OpCode.SB, temp, dest, i);
+        }
+    }
+
+    // determine if function returns a struct
+    private boolean isStructReturn(FunCallExpr fc) {
+        if (fc.decl == null) return false;
+        Type retType;
+        if (fc.decl instanceof FunDecl fd) {
+            retType = fd.type;
+        } else if (fc.decl instanceof FunDef fd) {
+            retType = fd.type;
+        } else {
+            return false;
+        }
+        return retType instanceof StructType;
+    }
+
+    // get return type from a func decl
+    private Type getReturnType(FunCallExpr fc) {
+        if (fc.decl instanceof FunDecl fd) {
+            return fd.type;
+        } else if (fc.decl instanceof FunDef fd) {
+            return fd.type;
+        }
+        return BaseType.UNKNOWN;
     }
 
 }

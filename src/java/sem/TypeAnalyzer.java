@@ -133,6 +133,10 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				if (arrayType instanceof ArrayType at) {
 					aa.type = at.elementType;
 					yield at.elementType;
+				} else if (arrayType instanceof PointerType pt) {
+					// for pointer types, the result is the pointer’s base type
+					aa.type = pt.base;
+					yield pt.base;
 				} else {
 					error("Array access on a non-array type.");
 					aa.type = BaseType.UNKNOWN;
@@ -162,24 +166,17 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				for (int i = 0; i < formals.size(); i++) {
 					Type formal = visit(formals.get(i));
 					Type actual = visit(fc.args.get(i));
-					if (formal instanceof ArrayType atFormal && actual instanceof ArrayType atActual) {
-						// compare the outer dimensions
-						if (atFormal.length != atActual.length) {
-							error("Array size mismatch for parameter " + formals.get(i).name +
-									" in function " + fc.name + ": expected " + atFormal.length +
-									", got " + atActual.length + ".");
+					// allow implicit conversion: if formal is pointer and actual is array,
+					// then they match if the array's element type equals the pointer's base
+					if (formal instanceof PointerType pt && actual instanceof ArrayType at) {
+						if (at.elementType.equals(pt.base)) {
+							continue;
 						}
-						// recursively compare the element types
-						if (!atFormal.elementType.equals(atActual.elementType)) {
-							error("Array element type mismatch for parameter " + formals.get(i).name +
-									" in function " + fc.name + ": expected " + atFormal.elementType +
-									", got " + atActual.elementType + ".");
-						}
-					} else if (!formal.equals(actual)) {
+					}
+					if (!formal.equals(actual)) {
 						error("Type mismatch for parameter " + formals.get(i).name +
 								" in function " + fc.name + ".");
 					}
-
 				}
 				if (fc.decl instanceof FunDecl fd) yield fd.type;
 				else if (fc.decl instanceof FunDef fd) yield fd.type;
