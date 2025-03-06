@@ -60,7 +60,6 @@ public class ExprValCodeGen extends CodeGen {
                 if (vd.type instanceof ArrayType) {
                     yield addrGen.visit(v);
                 }
-                // otherwise load value
                 Register addr = addrGen.visit(v);
                 Register result = Register.Virtual.create();
                 if (isCharType(v.vd.type)) {
@@ -68,6 +67,7 @@ public class ExprValCodeGen extends CodeGen {
                 } else {
                     asmProg.getCurrentTextSection().emit(OpCode.LW, result, addr, 0);
                 }
+                System.out.println("ExprValCodeGen: Loaded value for variable '" + v.name + "' from address " + addr);
                 yield result;
             }
 
@@ -79,6 +79,8 @@ public class ExprValCodeGen extends CodeGen {
                 Type elemType = null;
                 if (aa.array.type instanceof ArrayType at) {
                     elemType = at.elementType;
+                } else if (aa.array.type instanceof PointerType pt) {
+                    elemType = pt.base;
                 }
                 if (elemType == null) {
                     throw new RuntimeException("ArrayAccess on non-array type or unknown elementType.");
@@ -123,6 +125,7 @@ public class ExprValCodeGen extends CodeGen {
             // AddressOf, the value is the address of subexpr, call addrGen
             case AddressOfExpr ao -> {
                 Register address = addrGen.visit(ao.expr);
+                System.out.println("ExprValCodeGen: AddressOf computed for expression, address = " + address);
                 yield address;
             }
 
@@ -133,7 +136,7 @@ public class ExprValCodeGen extends CodeGen {
                     Register rhsVal = visit(assign.right);
                     Register lhsAddr = addrGen.visit(assign.left);
                     emitStructCopy(rhsVal, lhsAddr, structSize);
-                    // value of assignment expr is the RHS pointer
+                    System.out.println("Assign: Copied struct of size " + structSize + " from RHS to LHS at " + lhsAddr);
                     yield rhsVal;
                 } else {
                     Register rhsVal = visit(assign.right);
@@ -143,6 +146,7 @@ public class ExprValCodeGen extends CodeGen {
                     } else {
                         asmProg.getCurrentTextSection().emit(OpCode.SW, rhsVal, lhsAddr, 0);
                     }
+                    System.out.println("Assign: Stored value " + rhsVal + " into address " + lhsAddr);
                     yield rhsVal;
                 }
             }
@@ -259,24 +263,35 @@ public class ExprValCodeGen extends CodeGen {
                 } else {
                     boolean structReturn = isStructReturn(fc);
                     int extraArgs = structReturn ? 1 : 0;
-                    if (structReturn) {
-                        int structSize = getSize(getReturnType(fc));
-                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -structSize);
-                        asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.a0, Register.Arch.sp, Register.Arch.zero);
-                    }
+                    int totalArgSize = 0;
+                    // push args in reverse order
                     for (int i = fc.args.size() - 1; i >= 0; i--) {
-                        Register argVal = visit(fc.args.get(i));
-                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
-                        asmProg.getCurrentTextSection().emit(OpCode.SW, argVal, Register.Arch.sp, 0);
+                        Expr argExpr = fc.args.get(i);
+                        Type argType = argExpr.type;
+                        if (argType instanceof StructType) {
+                            int structSize = getSize(argType);
+                            // for each word in struct, load it from the arg's address and push it
+                            Register structAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(argExpr);
+                            for (int off = structSize - 4; off >= 0; off -= 4) {
+                                Register temp = Register.Virtual.create();
+                                asmProg.getCurrentTextSection().emit(OpCode.LW, temp, structAddr, off);
+                                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
+                                asmProg.getCurrentTextSection().emit(OpCode.SW, temp, Register.Arch.sp, 0);
+                                totalArgSize += 4;
+                            }
+                        } else {
+                            Register argVal = new ExprValCodeGen(asmProg, astRoot).visit(argExpr);
+                            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
+                            asmProg.getCurrentTextSection().emit(OpCode.SW, argVal, Register.Arch.sp, 0);
+                            totalArgSize += 4;
+                        }
                     }
                     asmProg.getCurrentTextSection().emit(OpCode.JAL, Label.get(fc.name));
-                    // pop the pushed args including the hidden one if any
-                    int stackAdj = (fc.args.size() + extraArgs) * 4;
-                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, stackAdj);
-
+                    // pop args, totalArgSize now accounts for the full struct sizes
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, totalArgSize + extraArgs * 4);
+                    // retrieve result
                     Register result = Register.Virtual.create();
                     if (structReturn) {
-                        // for struct returns, the hidden pointer (in $a0) is the result
                         asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.a0, Register.Arch.zero);
                     } else {
                         asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.v0, Register.Arch.zero);

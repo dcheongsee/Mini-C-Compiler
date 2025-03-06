@@ -13,112 +13,85 @@ global_i:
 .space 4
 # Allocated labels for virtual registers
 .align 2
-label_124_v58:
-.space 4
-.align 2
-label_112_v52:
-.space 4
-.align 2
-label_20_v6:
-.space 4
-.align 2
-label_115_v51:
-.space 4
-.align 2
-label_27_v9:
-.space 4
-.align 2
-label_13_v3:
-.space 4
-.align 2
-label_32_v12:
-.space 4
-.align 2
-label_81_v37:
-.space 4
-.align 2
-label_107_v49:
-.space 4
-.align 2
-label_127_v59:
-.space 4
-.align 2
-label_15_v1:
-.space 4
-.align 2
-label_75_v31:
-.space 4
-.align 2
-label_72_v32:
-.space 4
-.align 2
-label_93_v43:
-.space 4
-.align 2
-label_26_v0:
-.space 4
-.align 2
-label_106_v40:
-.space 4
-.align 2
-label_43_v15:
-.space 4
-.align 2
-label_64_v28:
-.space 4
-.align 2
-label_86_v30:
-.space 4
-.align 2
-label_21_v7:
-.space 4
-.align 2
-label_76_v34:
-.space 4
-.align 2
-label_101_v47:
-.space 4
-.align 2
-label_52_v22:
-.space 4
-.align 2
-label_33_v13:
-.space 4
-.align 2
-label_104_v48:
-.space 4
-.align 2
-label_53_v23:
-.space 4
-.align 2
-label_116_v54:
-.space 4
-.align 2
-label_73_v33:
-.space 4
-.align 2
-label_80_v36:
-.space 4
-.align 2
-label_121_v57:
-.space 4
-.align 2
-label_83_v35:
-.space 4
-.align 2
-label_16_v4:
-.space 4
-.align 2
-label_123_v55:
+label_84_v38:
 .space 4
 .align 2
 label_36_v14:
 .space 4
 .align 2
-label_40_v16:
+label_27_v9:
 .space 4
 .align 2
-label_120_v56:
+label_96_v44:
+.space 4
+.align 2
+label_13_v3:
+.space 4
+.align 2
+label_12_v2:
+.space 4
+.align 2
+label_66_v20:
+.space 4
+.align 2
+label_80_v36:
+.space 4
+.align 2
+label_75_v31:
+.space 4
+.align 2
+label_126_v50:
+.space 4
+.align 2
+label_112_v52:
+.space 4
+.align 2
+label_87_v39:
+.space 4
+.align 2
+label_32_v12:
+.space 4
+.align 2
+label_26_v0:
+.space 4
+.align 2
+label_46_v10:
+.space 4
+.align 2
+label_123_v55:
+.space 4
+.align 2
+label_92_v42:
+.space 4
+.align 2
+label_103_v45:
+.space 4
+.align 2
+label_73_v33:
+.space 4
+.align 2
+label_124_v58:
+.space 4
+.align 2
+label_64_v28:
+.space 4
+.align 2
+label_116_v54:
+.space 4
+.align 2
+label_44_v18:
+.space 4
+.align 2
+label_43_v15:
+.space 4
+.align 2
+label_67_v29:
+.space 4
+.align 2
+label_60_v26:
+.space 4
+.align 2
+label_107_v49:
 .space 4
 .align 2
 label_61_v27:
@@ -127,279 +100,309 @@ label_61_v27:
 label_55_v21:
 .space 4
 .align 2
-label_87_v39:
+label_52_v22:
 .space 4
 .align 2
-label_47_v19:
+label_104_v48:
 .space 4
 .align 2
-label_12_v2:
-.space 4
-.align 2
-label_92_v42:
+label_23_v5:
 .space 4
 .align 2
 label_24_v8:
 .space 4
 .align 2
-label_63_v25:
-.space 4
-.align 2
-label_60_v26:
-.space 4
-.align 2
-label_100_v46:
-.space 4
-.align 2
-label_41_v17:
-.space 4
-.align 2
-label_44_v18:
-.space 4
-.align 2
-label_67_v29:
-.space 4
-.align 2
-label_96_v44:
-.space 4
-.align 2
-label_46_v10:
-.space 4
-.align 2
-label_35_v11:
-.space 4
-.align 2
-label_66_v20:
-.space 4
-.align 2
-label_56_v24:
-.space 4
-.align 2
-label_126_v50:
-.space 4
-.align 2
-label_103_v45:
-.space 4
-.align 2
-label_84_v38:
+label_106_v40:
 .space 4
 .align 2
 label_95_v41:
 .space 4
 .align 2
+label_127_v59:
+.space 4
+.align 2
+label_20_v6:
+.space 4
+.align 2
+label_83_v35:
+.space 4
+.align 2
+label_76_v34:
+.space 4
+.align 2
+label_63_v25:
+.space 4
+.align 2
+label_101_v47:
+.space 4
+.align 2
+label_35_v11:
+.space 4
+.align 2
+label_56_v24:
+.space 4
+.align 2
+label_93_v43:
+.space 4
+.align 2
+label_120_v56:
+.space 4
+.align 2
+label_21_v7:
+.space 4
+.align 2
 label_113_v53:
 .space 4
 .align 2
-label_23_v5:
+label_86_v30:
+.space 4
+.align 2
+label_40_v16:
+.space 4
+.align 2
+label_53_v23:
+.space 4
+.align 2
+label_115_v51:
+.space 4
+.align 2
+label_47_v19:
+.space 4
+.align 2
+label_121_v57:
+.space 4
+.align 2
+label_15_v1:
+.space 4
+.align 2
+label_41_v17:
+.space 4
+.align 2
+label_72_v32:
+.space 4
+.align 2
+label_100_v46:
+.space 4
+.align 2
+label_33_v13:
+.space 4
+.align 2
+label_81_v37:
+.space 4
+.align 2
+label_16_v4:
 .space 4
 # Allocated labels for virtual registers
 .align 2
-label_167_v80:
-.space 4
-.align 2
-label_156_v75:
-.space 4
-.align 2
-label_134_v63:
-.space 4
-.align 2
-label_138_v65:
-.space 4
-.align 2
-label_192_v93:
-.space 4
-.align 2
-label_208_v99:
-.space 4
-.align 2
-label_229_v110:
-.space 4
-.align 2
-label_205_v100:
-.space 4
-.align 2
-label_211_v103:
-.space 4
-.align 2
-label_159_v76:
-.space 4
-.align 2
-label_209_v102:
-.space 4
-.align 2
-label_185_v90:
-.space 4
-.align 2
-label_142_v67:
-.space 4
-.align 2
-label_180_v87:
-.space 4
-.align 2
-label_256_v127:
-.space 4
-.align 2
-label_130_v61:
-.space 4
-.align 2
-label_227_v112:
-.space 4
-.align 2
-label_226_v111:
-.space 4
-.align 2
-label_163_v78:
-.space 4
-.align 2
-label_146_v69:
-.space 4
-.align 2
-label_243_v120:
-.space 4
-.align 2
-label_242_v117:
-.space 4
-.align 2
-label_190_v92:
-.space 4
-.align 2
-label_206_v101:
-.space 4
-.align 2
-label_151_v72:
-.space 4
-.align 2
-label_200_v95:
-.space 4
-.align 2
-label_221_v106:
-.space 4
-.align 2
-label_239_v118:
-.space 4
-.align 2
-label_201_v98:
-.space 4
-.align 2
-label_193_v94:
-.space 4
-.align 2
-label_251_v124:
-.space 4
-.align 2
-label_169_v81:
-.space 4
-.align 2
-label_184_v89:
+label_158_v73:
 .space 4
 .align 2
 label_143_v68:
 .space 4
 .align 2
-label_248_v123:
-.space 4
-.align 2
-label_177_v86:
-.space 4
-.align 2
-label_171_v82:
-.space 4
-.align 2
-label_164_v79:
-.space 4
-.align 2
-label_240_v119:
-.space 4
-.align 2
-label_214_v105:
-.space 4
-.align 2
-label_129_v60:
-.space 4
-.align 2
-label_166_v77:
-.space 4
-.align 2
-label_155_v74:
-.space 4
-.align 2
-label_232_v114:
-.space 4
-.align 2
-label_219_v108:
-.space 4
-.align 2
-label_235_v116:
-.space 4
-.align 2
-label_137_v62:
-.space 4
-.align 2
-label_198_v97:
-.space 4
-.align 2
-label_247_v122:
-.space 4
-.align 2
-label_172_v83:
-.space 4
-.align 2
-label_188_v91:
-.space 4
-.align 2
-label_218_v107:
-.space 4
-.align 2
-label_150_v71:
-.space 4
-.align 2
-label_179_v84:
-.space 4
-.align 2
-label_145_v66:
-.space 4
-.align 2
-label_197_v96:
-.space 4
-.align 2
-label_255_v126:
-.space 4
-.align 2
-label_230_v113:
-.space 4
-.align 2
-label_176_v85:
-.space 4
-.align 2
-label_250_v121:
+label_251_v124:
 .space 4
 .align 2
 label_253_v125:
 .space 4
 .align 2
-label_187_v88:
+label_247_v122:
 .space 4
 .align 2
-label_234_v115:
+label_177_v86:
 .space 4
 .align 2
-label_222_v109:
+label_190_v92:
+.space 4
+.align 2
+label_211_v103:
+.space 4
+.align 2
+label_192_v93:
+.space 4
+.align 2
+label_197_v96:
+.space 4
+.align 2
+label_146_v69:
+.space 4
+.align 2
+label_200_v95:
+.space 4
+.align 2
+label_172_v83:
+.space 4
+.align 2
+label_129_v60:
+.space 4
+.align 2
+label_167_v80:
+.space 4
+.align 2
+label_243_v120:
+.space 4
+.align 2
+label_214_v105:
 .space 4
 .align 2
 label_213_v104:
 .space 4
 .align 2
+label_150_v71:
+.space 4
+.align 2
+label_137_v62:
+.space 4
+.align 2
+label_230_v113:
+.space 4
+.align 2
+label_229_v110:
+.space 4
+.align 2
+label_256_v127:
+.space 4
+.align 2
+label_176_v85:
+.space 4
+.align 2
+label_193_v94:
+.space 4
+.align 2
+label_138_v65:
+.space 4
+.align 2
+label_187_v88:
+.space 4
+.align 2
+label_208_v99:
+.space 4
+.align 2
+label_226_v111:
+.space 4
+.align 2
+label_188_v91:
+.space 4
+.align 2
+label_180_v87:
+.space 4
+.align 2
+label_242_v117:
+.space 4
+.align 2
+label_155_v74:
+.space 4
+.align 2
+label_171_v82:
+.space 4
+.align 2
+label_248_v123:
+.space 4
+.align 2
+label_130_v61:
+.space 4
+.align 2
+label_235_v116:
+.space 4
+.align 2
+label_164_v79:
+.space 4
+.align 2
+label_156_v75:
+.space 4
+.align 2
+label_151_v72:
+.space 4
+.align 2
+label_227_v112:
+.space 4
+.align 2
+label_201_v98:
+.space 4
+.align 2
 label_148_v70:
+.space 4
+.align 2
+label_250_v121:
+.space 4
+.align 2
+label_142_v67:
+.space 4
+.align 2
+label_218_v107:
+.space 4
+.align 2
+label_206_v101:
+.space 4
+.align 2
+label_222_v109:
+.space 4
+.align 2
+label_185_v90:
+.space 4
+.align 2
+label_234_v115:
+.space 4
+.align 2
+label_255_v126:
+.space 4
+.align 2
+label_159_v76:
+.space 4
+.align 2
+label_179_v84:
+.space 4
+.align 2
+label_205_v100:
 .space 4
 .align 2
 label_135_v64:
 .space 4
 .align 2
-label_158_v73:
+label_166_v77:
+.space 4
+.align 2
+label_184_v89:
+.space 4
+.align 2
+label_240_v119:
+.space 4
+.align 2
+label_221_v106:
+.space 4
+.align 2
+label_163_v78:
+.space 4
+.align 2
+label_232_v114:
+.space 4
+.align 2
+label_239_v118:
+.space 4
+.align 2
+label_169_v81:
+.space 4
+.align 2
+label_219_v108:
+.space 4
+.align 2
+label_209_v102:
+.space 4
+.align 2
+label_198_v97:
+.space 4
+.align 2
+label_134_v63:
+.space 4
+.align 2
+label_145_v66:
 .space 4
 
 .text
 fill_matrix:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)
@@ -797,6 +800,9 @@ jr $ra
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)

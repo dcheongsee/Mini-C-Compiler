@@ -8,6 +8,7 @@ public final class VarDecl extends Decl {
     public int offset;         // for local variables
     public String globalLabel; // for global variables
     public Boolean isParameter = false;
+    public Boolean isArrayParam = false;
 
     public VarDecl(Type type, String name) {
 	    this.type = type;

@@ -17,430 +17,7 @@ str_10:
 .asciiz "\n"
 # Allocated labels for virtual registers
 .align 2
-label_317_v147:
-.space 4
-.align 2
-label_320_v149:
-.space 4
-.align 2
-label_174_v77:
-.space 4
-.align 2
-label_90_v35:
-.space 4
-.align 2
-label_229_v97:
-.space 4
-.align 2
-label_88_v34:
-.space 4
-.align 2
-label_243_v110:
-.space 4
-.align 2
-label_259_v118:
-.space 4
-.align 2
-label_155_v68:
-.space 4
-.align 2
-label_147_v63:
-.space 4
-.align 2
-label_184_v82:
-.space 4
-.align 2
-label_59_v20:
-.space 4
-.align 2
-label_162_v69:
-.space 4
-.align 2
-label_275_v125:
-.space 4
-.align 2
-label_108_v44:
-.space 4
-.align 2
-label_87_v32:
-.space 4
-.align 2
-label_46_v14:
-.space 4
-.align 2
-label_328_v153:
-.space 4
-.align 2
-label_150_v65:
-.space 4
-.align 2
-label_215_v90:
-.space 4
-.align 2
-label_240_v109:
-.space 4
-.align 2
-label_197_v87:
-.space 4
-.align 2
-label_49_v15:
-.space 4
-.align 2
-label_255_v116:
-.space 4
-.align 2
-label_272_v124:
-.space 4
-.align 2
-label_120_v50:
-.space 4
-.align 2
-label_143_v61:
-.space 4
-.align 2
-label_136_v58:
-.space 4
-.align 2
-label_248_v112:
-.space 4
-.align 2
-label_276_v126:
-.space 4
-.align 2
-label_256_v117:
-.space 4
-.align 2
-label_290_v131:
-.space 4
-.align 2
-label_292_v134:
-.space 4
-.align 2
-label_226_v101:
-.space 4
-.align 2
-label_65_v17:
-.space 4
-.align 2
-label_80_v30:
-.space 4
-.align 2
-label_30_v5:
-.space 4
-.align 2
-label_327_v152:
-.space 4
-.align 2
-label_181_v80:
-.space 4
-.align 2
-label_305_v141:
-.space 4
-.align 2
-label_52_v16:
-.space 4
-.align 2
-label_62_v18:
-.space 4
-.align 2
-label_164_v72:
-.space 4
-.align 2
-label_310_v144:
-.space 4
-.align 2
-label_96_v38:
-.space 4
-.align 2
-label_153_v67:
-.space 4
-.align 2
-label_134_v57:
-.space 4
-.align 2
-label_199_v75:
-.space 4
-.align 2
-label_106_v43:
-.space 4
-.align 2
-label_131_v56:
-.space 4
-.align 2
-label_200_v84:
-.space 4
-.align 2
-label_193_v86:
-.space 4
-.align 2
-label_314_v146:
-.space 4
-.align 2
-label_63_v22:
-.space 4
-.align 2
-label_25_v2:
-.space 4
-.align 2
-label_71_v25:
-.space 4
-.align 2
-label_115_v48:
-.space 4
-.align 2
-label_278_v127:
-.space 4
-.align 2
-label_323_v150:
-.space 4
-.align 2
-label_299_v138:
-.space 4
-.align 2
-label_36_v8:
-.space 4
-.align 2
-label_189_v83:
-.space 4
-.align 2
-label_262_v119:
-.space 4
-.align 2
-label_210_v94:
-.space 4
-.align 2
-label_38_v9:
-.space 4
-.align 2
-label_236_v107:
-.space 4
-.align 2
-label_300_v139:
-.space 4
-.align 2
-label_79_v29:
-.space 4
-.align 2
-label_258_v114:
-.space 4
-.align 2
-label_21_v0:
-.space 4
-.align 2
-label_133_v51:
-.space 4
-.align 2
-label_268_v122:
-.space 4
-.align 2
-label_281_v129:
-.space 4
-.align 2
-label_42_v12:
-.space 4
-.align 2
-label_75_v27:
-.space 4
-.align 2
-label_287_v133:
-.space 4
-.align 2
-label_177_v79:
-.space 4
-.align 2
-label_303_v140:
-.space 4
-.align 2
-label_117_v45:
-.space 4
-.align 2
-label_68_v24:
-.space 4
-.align 2
-label_318_v148:
-.space 4
-.align 2
-label_216_v96:
-.space 4
-.align 2
-label_264_v120:
-.space 4
-.align 2
-label_159_v71:
-.space 4
-.align 2
-label_111_v46:
-.space 4
-.align 2
-label_102_v41:
-.space 4
-.align 2
-label_213_v95:
-.space 4
-.align 2
-label_271_v123:
-.space 4
-.align 2
-label_296_v137:
-.space 4
-.align 2
-label_247_v105:
-.space 4
-.align 2
-label_261_v113:
-.space 4
-.align 2
-label_130_v52:
-.space 4
-.align 2
-label_230_v103:
-.space 4
-.align 2
-label_192_v85:
-.space 4
-.align 2
-label_324_v151:
-.space 4
-.align 2
-label_284_v128:
-.space 4
-.align 2
-label_313_v145:
-.space 4
-.align 2
-label_103_v42:
-.space 4
-.align 2
-label_288_v132:
-.space 4
-.align 2
-label_196_v88:
-.space 4
-.align 2
-label_170_v74:
-.space 4
-.align 2
-label_178_v78:
-.space 4
-.align 2
-label_140_v60:
-.space 4
-.align 2
-label_72_v26:
-.space 4
-.align 2
-label_114_v47:
-.space 4
-.align 2
-label_308_v143:
-.space 4
-.align 2
-label_66_v23:
-.space 4
-.align 2
-label_190_v81:
-.space 4
-.align 2
-label_227_v102:
-.space 4
-.align 2
-label_302_v136:
-.space 4
-.align 2
-label_209_v93:
-.space 4
-.align 2
-label_48_v11:
-.space 4
-.align 2
-label_45_v13:
-.space 4
-.align 2
-label_139_v59:
-.space 4
-.align 2
-label_124_v53:
-.space 4
-.align 2
-label_242_v106:
-.space 4
-.align 2
-label_82_v31:
-.space 4
-.align 2
-label_127_v54:
-.space 4
-.align 2
-label_283_v130:
-.space 4
-.align 2
-label_32_v6:
-.space 4
-.align 2
-label_94_v37:
-.space 4
-.align 2
-label_56_v19:
-.space 4
-.align 2
-label_99_v40:
-.space 4
-.align 2
-label_171_v73:
-.space 4
-.align 2
-label_212_v91:
-.space 4
-.align 2
-label_293_v135:
-.space 4
-.align 2
-label_156_v66:
-.space 4
-.align 2
-label_173_v76:
-.space 4
-.align 2
-label_232_v104:
-.space 4
-.align 2
-label_267_v121:
-.space 4
-.align 2
-label_105_v39:
-.space 4
-.align 2
-label_51_v10:
-.space 4
-.align 2
-label_29_v4:
-.space 4
-.align 2
-label_144_v62:
-.space 4
-.align 2
-label_128_v55:
-.space 4
-.align 2
-label_222_v99:
-.space 4
-.align 2
 label_252_v115:
-.space 4
-.align 2
-label_206_v92:
-.space 4
-.align 2
-label_245_v111:
-.space 4
-.align 2
-label_307_v142:
-.space 4
-.align 2
-label_22_v1:
-.space 4
-.align 2
-label_239_v108:
 .space 4
 .align 2
 label_219_v98:
@@ -449,39 +26,465 @@ label_219_v98:
 label_223_v100:
 .space 4
 .align 2
-label_202_v89:
+label_75_v27:
 .space 4
 .align 2
-label_26_v3:
+label_284_v128:
 .space 4
 .align 2
-label_35_v7:
+label_115_v48:
 .space 4
 .align 2
-label_85_v33:
+label_143_v61:
 .space 4
 .align 2
-label_118_v49:
+label_299_v138:
 .space 4
 .align 2
-label_76_v28:
+label_245_v111:
 .space 4
 .align 2
-label_148_v64:
+label_296_v137:
 .space 4
 .align 2
 label_160_v70:
 .space 4
 .align 2
-label_60_v21:
+label_56_v19:
+.space 4
+.align 2
+label_46_v14:
+.space 4
+.align 2
+label_85_v33:
+.space 4
+.align 2
+label_275_v125:
+.space 4
+.align 2
+label_268_v122:
+.space 4
+.align 2
+label_63_v22:
+.space 4
+.align 2
+label_174_v77:
+.space 4
+.align 2
+label_232_v104:
+.space 4
+.align 2
+label_52_v16:
+.space 4
+.align 2
+label_102_v41:
+.space 4
+.align 2
+label_140_v60:
+.space 4
+.align 2
+label_94_v37:
+.space 4
+.align 2
+label_153_v67:
+.space 4
+.align 2
+label_278_v127:
+.space 4
+.align 2
+label_173_v76:
+.space 4
+.align 2
+label_22_v1:
+.space 4
+.align 2
+label_236_v107:
+.space 4
+.align 2
+label_283_v130:
+.space 4
+.align 2
+label_305_v141:
+.space 4
+.align 2
+label_42_v12:
+.space 4
+.align 2
+label_38_v9:
+.space 4
+.align 2
+label_147_v63:
+.space 4
+.align 2
+label_178_v78:
+.space 4
+.align 2
+label_155_v68:
+.space 4
+.align 2
+label_192_v85:
+.space 4
+.align 2
+label_193_v86:
+.space 4
+.align 2
+label_255_v116:
+.space 4
+.align 2
+label_130_v52:
+.space 4
+.align 2
+label_272_v124:
+.space 4
+.align 2
+label_230_v103:
+.space 4
+.align 2
+label_267_v121:
+.space 4
+.align 2
+label_82_v31:
+.space 4
+.align 2
+label_206_v92:
+.space 4
+.align 2
+label_256_v117:
+.space 4
+.align 2
+label_258_v114:
+.space 4
+.align 2
+label_66_v23:
+.space 4
+.align 2
+label_303_v140:
+.space 4
+.align 2
+label_213_v95:
+.space 4
+.align 2
+label_248_v112:
+.space 4
+.align 2
+label_62_v18:
+.space 4
+.align 2
+label_240_v109:
+.space 4
+.align 2
+label_36_v8:
+.space 4
+.align 2
+label_80_v30:
+.space 4
+.align 2
+label_320_v149:
+.space 4
+.align 2
+label_35_v7:
+.space 4
+.align 2
+label_105_v39:
+.space 4
+.align 2
+label_308_v143:
 .space 4
 .align 2
 label_93_v36:
+.space 4
+.align 2
+label_229_v97:
+.space 4
+.align 2
+label_287_v133:
+.space 4
+.align 2
+label_307_v142:
+.space 4
+.align 2
+label_262_v119:
+.space 4
+.align 2
+label_177_v79:
+.space 4
+.align 2
+label_226_v101:
+.space 4
+.align 2
+label_202_v89:
+.space 4
+.align 2
+label_88_v34:
+.space 4
+.align 2
+label_288_v132:
+.space 4
+.align 2
+label_159_v71:
+.space 4
+.align 2
+label_117_v45:
+.space 4
+.align 2
+label_136_v58:
+.space 4
+.align 2
+label_215_v90:
+.space 4
+.align 2
+label_150_v65:
+.space 4
+.align 2
+label_25_v2:
+.space 4
+.align 2
+label_171_v73:
+.space 4
+.align 2
+label_181_v80:
+.space 4
+.align 2
+label_189_v83:
+.space 4
+.align 2
+label_310_v144:
+.space 4
+.align 2
+label_79_v29:
+.space 4
+.align 2
+label_212_v91:
+.space 4
+.align 2
+label_247_v105:
+.space 4
+.align 2
+label_222_v99:
+.space 4
+.align 2
+label_239_v108:
+.space 4
+.align 2
+label_114_v47:
+.space 4
+.align 2
+label_162_v69:
+.space 4
+.align 2
+label_60_v21:
+.space 4
+.align 2
+label_243_v110:
+.space 4
+.align 2
+label_111_v46:
+.space 4
+.align 2
+label_170_v74:
+.space 4
+.align 2
+label_292_v134:
+.space 4
+.align 2
+label_313_v145:
+.space 4
+.align 2
+label_293_v135:
+.space 4
+.align 2
+label_200_v84:
+.space 4
+.align 2
+label_131_v56:
+.space 4
+.align 2
+label_148_v64:
+.space 4
+.align 2
+label_26_v3:
+.space 4
+.align 2
+label_127_v54:
+.space 4
+.align 2
+label_90_v35:
+.space 4
+.align 2
+label_227_v102:
+.space 4
+.align 2
+label_199_v75:
+.space 4
+.align 2
+label_216_v96:
+.space 4
+.align 2
+label_317_v147:
+.space 4
+.align 2
+label_314_v146:
+.space 4
+.align 2
+label_184_v82:
+.space 4
+.align 2
+label_261_v113:
+.space 4
+.align 2
+label_96_v38:
+.space 4
+.align 2
+label_71_v25:
+.space 4
+.align 2
+label_76_v28:
+.space 4
+.align 2
+label_327_v152:
+.space 4
+.align 2
+label_48_v11:
+.space 4
+.align 2
+label_302_v136:
+.space 4
+.align 2
+label_210_v94:
+.space 4
+.align 2
+label_328_v153:
+.space 4
+.align 2
+label_290_v131:
+.space 4
+.align 2
+label_87_v32:
+.space 4
+.align 2
+label_281_v129:
+.space 4
+.align 2
+label_124_v53:
+.space 4
+.align 2
+label_196_v88:
+.space 4
+.align 2
+label_108_v44:
+.space 4
+.align 2
+label_51_v10:
+.space 4
+.align 2
+label_29_v4:
+.space 4
+.align 2
+label_134_v57:
+.space 4
+.align 2
+label_30_v5:
+.space 4
+.align 2
+label_190_v81:
+.space 4
+.align 2
+label_68_v24:
+.space 4
+.align 2
+label_103_v42:
+.space 4
+.align 2
+label_197_v87:
+.space 4
+.align 2
+label_65_v17:
+.space 4
+.align 2
+label_72_v26:
+.space 4
+.align 2
+label_128_v55:
+.space 4
+.align 2
+label_164_v72:
+.space 4
+.align 2
+label_324_v151:
+.space 4
+.align 2
+label_259_v118:
+.space 4
+.align 2
+label_276_v126:
+.space 4
+.align 2
+label_45_v13:
+.space 4
+.align 2
+label_242_v106:
+.space 4
+.align 2
+label_32_v6:
+.space 4
+.align 2
+label_120_v50:
+.space 4
+.align 2
+label_156_v66:
+.space 4
+.align 2
+label_106_v43:
+.space 4
+.align 2
+label_318_v148:
+.space 4
+.align 2
+label_144_v62:
+.space 4
+.align 2
+label_264_v120:
+.space 4
+.align 2
+label_209_v93:
+.space 4
+.align 2
+label_139_v59:
+.space 4
+.align 2
+label_271_v123:
+.space 4
+.align 2
+label_118_v49:
+.space 4
+.align 2
+label_133_v51:
+.space 4
+.align 2
+label_99_v40:
+.space 4
+.align 2
+label_21_v0:
+.space 4
+.align 2
+label_323_v150:
+.space 4
+.align 2
+label_49_v15:
+.space 4
+.align 2
+label_300_v139:
+.space 4
+.align 2
+label_59_v20:
 .space 4
 
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)

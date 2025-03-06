@@ -230,17 +230,22 @@ public class Parser extends CompilerPass {
     private VarDecl parseParam() {
         Type baseType = parseType();
         Token ident = expect(Category.IDENTIFIER);
-        // parse any array dim
+        // parse any array dimensions
         Type arrayType = parseArrayDimensions(baseType);
-        // if param type is array, convert to pointer type
+        // if param type is array, convert to pointer type and mark as an array parameter
         Type finalType;
-        if (arrayType instanceof ArrayType at) {
-            finalType = new PointerType(at.elementType);
+        boolean isArrayParam = false;
+        if (arrayType instanceof ArrayType) {
+            finalType = new PointerType(((ArrayType) arrayType).elementType);
+            isArrayParam = true;
         } else {
             finalType = arrayType;
         }
-        return new VarDecl(finalType, ident.data);
+        VarDecl vd = new VarDecl(finalType, ident.data);
+        vd.isArrayParam = isArrayParam;  // set the new flag
+        return vd;
     }
+
 
     private Type parseType() {
         Type type;

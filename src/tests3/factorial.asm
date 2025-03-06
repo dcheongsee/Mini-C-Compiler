@@ -15,28 +15,16 @@ str_2355908448:
 .asciiz "Enter a number:\n"
 # Allocated labels for virtual registers
 .align 2
-label_34_v11:
+label_14_v1:
 .space 4
 .align 2
 label_30_v9:
 .space 4
 .align 2
-label_36_v12:
-.space 4
-.align 2
-label_48_v18:
-.space 4
-.align 2
-label_20_v3:
-.space 4
-.align 2
-label_19_v4:
-.space 4
-.align 2
 label_43_v15:
 .space 4
 .align 2
-label_13_v0:
+label_22_v5:
 .space 4
 .align 2
 label_16_v2:
@@ -45,60 +33,75 @@ label_16_v2:
 label_24_v6:
 .space 4
 .align 2
-label_33_v10:
-.space 4
-.align 2
-label_39_v13:
-.space 4
-.align 2
-label_29_v7:
-.space 4
-.align 2
-label_14_v1:
-.space 4
-.align 2
-label_22_v5:
-.space 4
-.align 2
-label_40_v14:
+label_36_v12:
 .space 4
 .align 2
 label_44_v16:
 .space 4
 .align 2
-label_27_v8:
+label_29_v7:
+.space 4
+.align 2
+label_39_v13:
+.space 4
+.align 2
+label_34_v11:
+.space 4
+.align 2
+label_48_v18:
+.space 4
+.align 2
+label_19_v4:
+.space 4
+.align 2
+label_13_v0:
 .space 4
 .align 2
 label_46_v17:
 .space 4
+.align 2
+label_20_v3:
+.space 4
+.align 2
+label_40_v14:
+.space 4
+.align 2
+label_27_v8:
+.space 4
+.align 2
+label_33_v10:
+.space 4
 # Allocated labels for virtual registers
-.align 2
-label_50_v19:
-.space 4
-.align 2
-label_57_v23:
-.space 4
 .align 2
 label_61_v25:
 .space 4
 .align 2
-label_62_v26:
-.space 4
-.align 2
-label_54_v21:
-.space 4
-.align 2
-label_59_v24:
+label_50_v19:
 .space 4
 .align 2
 label_51_v20:
 .space 4
 .align 2
+label_57_v23:
+.space 4
+.align 2
+label_54_v21:
+.space 4
+.align 2
 label_55_v22:
+.space 4
+.align 2
+label_62_v26:
+.space 4
+.align 2
+label_59_v24:
 .space 4
 
 .text
 factorial:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)
@@ -254,6 +257,9 @@ jr $ra
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)

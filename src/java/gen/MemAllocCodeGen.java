@@ -151,6 +151,9 @@ public class MemAllocCodeGen extends CodeGen {
                 fpOffset = alignTo(fpOffset, align);
                 fpOffset += size;
                 vd.offset = -fpOffset;
+                // Debug print: report local variable allocation
+                System.out.println("Allocated local variable '" + vd.name + "' of type " + vd.type +
+                        " at offset " + vd.offset);
             }
             for (ASTNode child : b.children()) {
                 visit(child, false);

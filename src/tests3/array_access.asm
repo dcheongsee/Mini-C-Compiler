@@ -13,103 +13,79 @@ global_i:
 .space 4
 # Allocated labels for virtual registers
 .align 2
-label_112_v55:
-.space 4
-.align 2
-label_101_v49:
-.space 4
-.align 2
-label_11_v3:
-.space 4
-.align 2
-label_104_v48:
-.space 4
-.align 2
-label_28_v6:
-.space 4
-.align 2
-label_16_v0:
-.space 4
-.align 2
-label_23_v9:
-.space 4
-.align 2
-label_78_v34:
-.space 4
-.align 2
-label_96_v46:
-.space 4
-.align 2
-label_62_v28:
-.space 4
-.align 2
-label_63_v29:
-.space 4
-.align 2
-label_84_v40:
-.space 4
-.align 2
-label_79_v37:
-.space 4
-.align 2
-label_40_v12:
-.space 4
-.align 2
-label_57_v25:
-.space 4
-.align 2
-label_65_v27:
-.space 4
-.align 2
-label_14_v4:
-.space 4
-.align 2
-label_68_v31:
-.space 4
-.align 2
-label_92_v44:
-.space 4
-.align 2
-label_45_v19:
-.space 4
-.align 2
-label_26_v10:
-.space 4
-.align 2
-label_94_v45:
-.space 4
-.align 2
-label_46_v20:
-.space 4
-.align 2
-label_105_v51:
-.space 4
-.align 2
-label_66_v30:
-.space 4
-.align 2
-label_71_v33:
-.space 4
-.align 2
-label_110_v54:
-.space 4
-.align 2
-label_70_v32:
-.space 4
-.align 2
-label_13_v1:
-.space 4
-.align 2
-label_107_v52:
+label_75_v35:
 .space 4
 .align 2
 label_29_v11:
 .space 4
 .align 2
-label_37_v13:
+label_28_v6:
 .space 4
 .align 2
-label_109_v53:
+label_91_v41:
+.space 4
+.align 2
+label_16_v0:
+.space 4
+.align 2
+label_41_v17:
+.space 4
+.align 2
+label_71_v33:
+.space 4
+.align 2
+label_62_v28:
+.space 4
+.align 2
+label_97_v47:
+.space 4
+.align 2
+label_101_v49:
+.space 4
+.align 2
+label_76_v36:
+.space 4
+.align 2
+label_23_v9:
+.space 4
+.align 2
+label_25_v7:
+.space 4
+.align 2
+label_107_v52:
+.space 4
+.align 2
+label_83_v39:
+.space 4
+.align 2
+label_88_v42:
+.space 4
+.align 2
+label_66_v30:
+.space 4
+.align 2
+label_112_v55:
+.space 4
+.align 2
+label_57_v25:
+.space 4
+.align 2
+label_105_v51:
+.space 4
+.align 2
+label_35_v15:
+.space 4
+.align 2
+label_40_v12:
+.space 4
+.align 2
+label_58_v26:
+.space 4
+.align 2
+label_53_v23:
+.space 4
+.align 2
+label_96_v46:
 .space 4
 .align 2
 label_55_v24:
@@ -118,72 +94,99 @@ label_55_v24:
 label_52_v18:
 .space 4
 .align 2
-label_76_v36:
+label_45_v19:
 .space 4
 .align 2
-label_38_v16:
+label_94_v45:
 .space 4
 .align 2
-label_83_v39:
+label_10_v2:
 .space 4
 .align 2
 label_17_v5:
 .space 4
 .align 2
-label_50_v22:
-.space 4
-.align 2
-label_53_v23:
-.space 4
-.align 2
-label_89_v43:
-.space 4
-.align 2
-label_34_v14:
-.space 4
-.align 2
-label_35_v15:
-.space 4
-.align 2
-label_58_v26:
-.space 4
-.align 2
-label_91_v41:
-.space 4
-.align 2
-label_25_v7:
-.space 4
-.align 2
-label_22_v8:
-.space 4
-.align 2
-label_41_v17:
-.space 4
-.align 2
-label_49_v21:
-.space 4
-.align 2
-label_97_v47:
-.space 4
-.align 2
-label_88_v42:
-.space 4
-.align 2
-label_75_v35:
+label_79_v37:
 .space 4
 .align 2
 label_81_v38:
 .space 4
 .align 2
+label_11_v3:
+.space 4
+.align 2
+label_70_v32:
+.space 4
+.align 2
+label_68_v31:
+.space 4
+.align 2
+label_50_v22:
+.space 4
+.align 2
+label_92_v44:
+.space 4
+.align 2
+label_22_v8:
+.space 4
+.align 2
+label_49_v21:
+.space 4
+.align 2
+label_84_v40:
+.space 4
+.align 2
+label_109_v53:
+.space 4
+.align 2
+label_14_v4:
+.space 4
+.align 2
 label_102_v50:
 .space 4
 .align 2
-label_10_v2:
+label_65_v27:
+.space 4
+.align 2
+label_37_v13:
+.space 4
+.align 2
+label_46_v20:
+.space 4
+.align 2
+label_104_v48:
+.space 4
+.align 2
+label_38_v16:
+.space 4
+.align 2
+label_110_v54:
+.space 4
+.align 2
+label_34_v14:
+.space 4
+.align 2
+label_63_v29:
+.space 4
+.align 2
+label_89_v43:
+.space 4
+.align 2
+label_26_v10:
+.space 4
+.align 2
+label_78_v34:
+.space 4
+.align 2
+label_13_v1:
 .space 4
 
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)

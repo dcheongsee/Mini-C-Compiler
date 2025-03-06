@@ -15,133 +15,100 @@ str_2355908448:
 .asciiz "Enter a number:\n"
 # Allocated labels for virtual registers
 .align 2
+label_54_v20:
+.space 4
+.align 2
 label_103_v47:
 .space 4
 .align 2
-label_93_v41:
+label_65_v26:
 .space 4
 .align 2
-label_92_v35:
-.space 4
-.align 2
-label_79_v33:
-.space 4
-.align 2
-label_115_v53:
-.space 4
-.align 2
-label_146_v69:
-.space 4
-.align 2
-label_137_v64:
-.space 4
-.align 2
-label_51_v19:
-.space 4
-.align 2
-label_99_v44:
-.space 4
-.align 2
-label_75_v31:
-.space 4
-.align 2
-label_95_v42:
-.space 4
-.align 2
-label_38_v13:
-.space 4
-.align 2
-label_141_v66:
-.space 4
-.align 2
-label_131_v61:
-.space 4
-.align 2
-label_39_v14:
-.space 4
-.align 2
-label_64_v25:
-.space 4
-.align 2
-label_112_v51:
-.space 4
-.align 2
-label_105_v48:
+label_108_v49:
 .space 4
 .align 2
 label_140_v62:
 .space 4
 .align 2
-label_127_v59:
+label_123_v57:
 .space 4
 .align 2
-label_58_v22:
+label_138_v65:
 .space 4
 .align 2
-label_44_v10:
-.space 4
-.align 2
-label_35_v12:
-.space 4
-.align 2
-label_45_v16:
-.space 4
-.align 2
-label_70_v29:
-.space 4
-.align 2
-label_130_v60:
-.space 4
-.align 2
-label_22_v4:
-.space 4
-.align 2
-label_119_v54:
-.space 4
-.align 2
-label_73_v30:
+label_18_v2:
 .space 4
 .align 2
 label_118_v55:
 .space 4
 .align 2
-label_23_v5:
-.space 4
-.align 2
-label_83_v37:
-.space 4
-.align 2
-label_42_v15:
-.space 4
-.align 2
 label_50_v18:
 .space 4
 .align 2
-label_90_v40:
+label_38_v13:
 .space 4
 .align 2
-label_47_v17:
+label_78_v32:
+.space 4
+.align 2
+label_92_v35:
+.space 4
+.align 2
+label_55_v21:
 .space 4
 .align 2
 label_86_v38:
 .space 4
 .align 2
+label_61_v24:
+.space 4
+.align 2
+label_67_v27:
+.space 4
+.align 2
+label_42_v15:
+.space 4
+.align 2
+label_93_v41:
+.space 4
+.align 2
+label_44_v10:
+.space 4
+.align 2
+label_131_v61:
+.space 4
+.align 2
+label_83_v37:
+.space 4
+.align 2
 label_145_v68:
 .space 4
 .align 2
-label_143_v67:
+label_14_v0:
 .space 4
 .align 2
-label_126_v58:
+label_41_v11:
 .space 4
 .align 2
-label_98_v43:
+label_29_v8:
 .space 4
 .align 2
-label_123_v57:
+label_137_v64:
 .space 4
 .align 2
-label_87_v39:
+label_75_v31:
+.space 4
+.align 2
+label_146_v69:
+.space 4
+.align 2
+label_119_v54:
+.space 4
+.align 2
+label_99_v44:
+.space 4
+.align 2
+label_115_v53:
 .space 4
 .align 2
 label_31_v9:
@@ -150,78 +117,114 @@ label_31_v9:
 label_19_v3:
 .space 4
 .align 2
-label_55_v21:
+label_126_v58:
 .space 4
 .align 2
-label_15_v1:
+label_22_v4:
 .space 4
 .align 2
-label_61_v24:
+label_73_v30:
 .space 4
 .align 2
-label_134_v63:
-.space 4
-.align 2
-label_108_v49:
-.space 4
-.align 2
-label_121_v56:
-.space 4
-.align 2
-label_28_v7:
-.space 4
-.align 2
-label_29_v8:
-.space 4
-.align 2
-label_71_v28:
-.space 4
-.align 2
-label_14_v0:
-.space 4
-.align 2
-label_113_v52:
-.space 4
-.align 2
-label_41_v11:
-.space 4
-.align 2
-label_65_v26:
-.space 4
-.align 2
-label_18_v2:
-.space 4
-.align 2
-label_25_v6:
-.space 4
-.align 2
-label_78_v32:
-.space 4
-.align 2
-label_109_v50:
-.space 4
-.align 2
-label_67_v27:
-.space 4
-.align 2
-label_138_v65:
-.space 4
-.align 2
-label_102_v46:
-.space 4
-.align 2
-label_54_v20:
+label_58_v22:
 .space 4
 .align 2
 label_59_v23:
 .space 4
 .align 2
+label_95_v42:
+.space 4
+.align 2
+label_47_v17:
+.space 4
+.align 2
+label_45_v16:
+.space 4
+.align 2
+label_28_v7:
+.space 4
+.align 2
+label_70_v29:
+.space 4
+.align 2
+label_25_v6:
+.space 4
+.align 2
+label_64_v25:
+.space 4
+.align 2
+label_121_v56:
+.space 4
+.align 2
+label_87_v39:
+.space 4
+.align 2
 label_89_v36:
+.space 4
+.align 2
+label_35_v12:
+.space 4
+.align 2
+label_23_v5:
+.space 4
+.align 2
+label_112_v51:
+.space 4
+.align 2
+label_143_v67:
+.space 4
+.align 2
+label_79_v33:
+.space 4
+.align 2
+label_98_v43:
+.space 4
+.align 2
+label_102_v46:
+.space 4
+.align 2
+label_127_v59:
+.space 4
+.align 2
+label_134_v63:
+.space 4
+.align 2
+label_141_v66:
+.space 4
+.align 2
+label_15_v1:
+.space 4
+.align 2
+label_130_v60:
+.space 4
+.align 2
+label_109_v50:
+.space 4
+.align 2
+label_113_v52:
+.space 4
+.align 2
+label_90_v40:
+.space 4
+.align 2
+label_39_v14:
+.space 4
+.align 2
+label_71_v28:
+.space 4
+.align 2
+label_51_v19:
+.space 4
+.align 2
+label_105_v48:
 .space 4
 
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)

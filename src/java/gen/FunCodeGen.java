@@ -30,21 +30,27 @@ public class FunCodeGen extends CodeGen {
         Label functionLabel = Label.get(fd.name);
         asmProg.getCurrentTextSection().emit(functionLabel);
 
+        asmProg.getCurrentTextSection().emit(OpCode.ANDI, Register.Arch.sp, Register.Arch.sp, 0xFFFFFFFC);
+        asmProg.getCurrentTextSection().emit(new gen.asm.Comment("Align sp to word boundary"));
+
         // prolog, push $ra onto the stack then set up frame pointer
         asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -8);
         asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.fp, Register.Arch.sp, 4); // Save old fp
         asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.ra, Register.Arch.sp, 0); // Save ra
         asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.fp, Register.Arch.sp, Register.Arch.zero);
 
-        int localSpace = fd.localVarSize;  // localVarSize computed by MemAllocCodeGen
-        if (localSpace > 0) {
-            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -localSpace);
+        int localSpace = fd.localVarSize;  // computed by MemAllocCodeGen
+        int alignedLocalSpace = ((localSpace + 3) / 4) * 4;  // round up to nearest multiple of 4
+        if (alignedLocalSpace > 0) {
+            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -alignedLocalSpace);
         }
 
         // set up return label
         StmtCodeGen scd = new StmtCodeGen(asmProg, SemanticAnalyzer.GlobalAST);
         Label retLabel = Label.create("return_" + fd.name);
         scd.returnLabel = retLabel;
+
+        System.out.println("FunCodeGen: Entering function '" + fd.name + "'. Local variable space = " + fd.localVarSize);
 
         // emit function body
         scd.visit(fd.block);
@@ -60,7 +66,7 @@ public class FunCodeGen extends CodeGen {
             emitStructCopy(localResult, Register.Arch.a0, structSize);
         }
 
-        if (localSpace > 0) {
+        if (alignedLocalSpace > 0) {
             asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, localSpace);
         }
 

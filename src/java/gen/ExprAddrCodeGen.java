@@ -52,14 +52,26 @@ public class ExprAddrCodeGen extends CodeGen {
                     throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
                 }
                 Register addrReg = Register.Virtual.create();
+                System.out.println("isParameter: " + vd.isParameter);
+                System.out.println("isArrayParam: " + vd.isArrayParam);
                 if (vd.globalLabel != null) {
                     asmProg.getCurrentTextSection().emit(OpCode.LA, addrReg, Label.get(vd.globalLabel));
                 } else if (vd.isParameter) {
-                    // for params, load pointer from fp+offset
-                    asmProg.getCurrentTextSection().emit(OpCode.LW, addrReg, Register.Arch.fp, vd.offset);
+                    // use different behavior for array params vs pointer params
+                    if (vd.isArrayParam) {
+                        // for params declared as arrays (which decay to pointers)
+                        // load pointer value from parameter slot
+                        asmProg.getCurrentTextSection().emit(OpCode.LW, addrReg, Register.Arch.fp, vd.offset);
+                    } else {
+                        // for pointer (and scalar) params the caller already stored the pointer value
+                        // so compute address using ADDIU
+                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addrReg, Register.Arch.fp, vd.offset);
+                    }
                 } else {
                     asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addrReg, Register.Arch.fp, vd.offset);
                 }
+                System.out.println("ExprAddrCodeGen: VarExpr '" + v.name +
+                        "' at computed address (fp+offset): " + vd.offset);
                 yield addrReg;
             }
 
@@ -91,6 +103,8 @@ public class ExprAddrCodeGen extends CodeGen {
                 int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
                 Register finalAddr = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, baseAddr, fieldOffset);
+                System.out.println("ExprAddrCodeGen: FieldAccessExpr on field '" + fa.field +
+                        "' with base address: " + baseAddr + " and offset: " + fieldOffset);
                 yield finalAddr;
             }
 
