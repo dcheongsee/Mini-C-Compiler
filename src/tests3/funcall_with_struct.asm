@@ -13,251 +13,251 @@ global_i:
 .space 4
 # Allocated labels for virtual registers
 .align 2
+label_39_v15:
+.space 4
+.align 2
 label_62_v25:
-.space 4
-.align 2
-label_14_v1:
-.space 4
-.align 2
-label_30_v9:
-.space 4
-.align 2
-label_83_v35:
-.space 4
-.align 2
-label_71_v31:
-.space 4
-.align 2
-label_63_v27:
-.space 4
-.align 2
-label_65_v28:
-.space 4
-.align 2
-label_52_v22:
 .space 4
 .align 2
 label_54_v21:
 .space 4
 .align 2
-label_33_v12:
-.space 4
-.align 2
-label_80_v34:
-.space 4
-.align 2
-label_23_v7:
-.space 4
-.align 2
-label_31_v11:
-.space 4
-.align 2
-label_55_v23:
-.space 4
-.align 2
-label_87_v30:
+label_46_v17:
 .space 4
 .align 2
 label_44_v18:
 .space 4
 .align 2
-label_89_v37:
+label_86_v36:
 .space 4
 .align 2
-label_60_v26:
+label_33_v12:
 .space 4
 .align 2
-label_46_v17:
-.space 4
-.align 2
-label_15_v3:
-.space 4
-.align 2
-label_28_v10:
-.space 4
-.align 2
-label_67_v29:
-.space 4
-.align 2
-label_74_v32:
-.space 4
-.align 2
-label_49_v20:
-.space 4
-.align 2
-label_39_v15:
-.space 4
-.align 2
-label_22_v5:
+label_31_v11:
 .space 4
 .align 2
 label_12_v2:
 .space 4
 .align 2
-label_20_v6:
+label_57_v24:
 .space 4
 .align 2
-label_41_v16:
+label_14_v1:
 .space 4
 .align 2
 label_38_v13:
 .space 4
 .align 2
-label_86_v36:
-.space 4
-.align 2
-label_17_v4:
-.space 4
-.align 2
-label_47_v19:
+label_49_v20:
 .space 4
 .align 2
 label_77_v33:
 .space 4
 .align 2
+label_25_v8:
+.space 4
+.align 2
+label_63_v27:
+.space 4
+.align 2
+label_67_v29:
+.space 4
+.align 2
+label_87_v30:
+.space 4
+.align 2
+label_41_v16:
+.space 4
+.align 2
+label_23_v7:
+.space 4
+.align 2
+label_74_v32:
+.space 4
+.align 2
 label_9_v0:
 .space 4
 .align 2
-label_57_v24:
+label_47_v19:
+.space 4
+.align 2
+label_52_v22:
+.space 4
+.align 2
+label_28_v10:
+.space 4
+.align 2
+label_65_v28:
+.space 4
+.align 2
+label_83_v35:
+.space 4
+.align 2
+label_22_v5:
+.space 4
+.align 2
+label_89_v37:
+.space 4
+.align 2
+label_71_v31:
+.space 4
+.align 2
+label_20_v6:
+.space 4
+.align 2
+label_15_v3:
+.space 4
+.align 2
+label_80_v34:
+.space 4
+.align 2
+label_60_v26:
+.space 4
+.align 2
+label_30_v9:
+.space 4
+.align 2
+label_55_v23:
 .space 4
 .align 2
 label_36_v14:
 .space 4
 .align 2
-label_25_v8:
+label_17_v4:
 .space 4
 # Allocated labels for virtual registers
 .align 2
-label_146_v60:
-.space 4
-.align 2
-label_137_v55:
-.space 4
-.align 2
-label_156_v66:
-.space 4
-.align 2
-label_101_v43:
-.space 4
-.align 2
-label_149_v62:
+label_120_v50:
 .space 4
 .align 2
 label_130_v45:
 .space 4
 .align 2
-label_144_v59:
-.space 4
-.align 2
-label_95_v40:
-.space 4
-.align 2
-label_140_v57:
-.space 4
-.align 2
-label_168_v73:
-.space 4
-.align 2
-label_179_v79:
-.space 4
-.align 2
-label_135_v54:
-.space 4
-.align 2
-label_181_v80:
-.space 4
-.align 2
 label_139_v56:
-.space 4
-.align 2
-label_163_v70:
-.space 4
-.align 2
-label_108_v47:
-.space 4
-.align 2
-label_99_v42:
-.space 4
-.align 2
-label_158_v67:
-.space 4
-.align 2
-label_175_v77:
-.space 4
-.align 2
-label_97_v41:
-.space 4
-.align 2
-label_151_v63:
-.space 4
-.align 2
-label_165_v71:
-.space 4
-.align 2
-label_124_v51:
-.space 4
-.align 2
-label_153_v64:
-.space 4
-.align 2
-label_142_v58:
-.space 4
-.align 2
-label_116_v49:
-.space 4
-.align 2
-label_133_v46:
-.space 4
-.align 2
-label_174_v76:
-.space 4
-.align 2
-label_154_v65:
-.space 4
-.align 2
-label_167_v72:
-.space 4
-.align 2
-label_182_v81:
-.space 4
-.align 2
-label_91_v38:
 .space 4
 .align 2
 label_128_v52:
 .space 4
 .align 2
+label_116_v49:
+.space 4
+.align 2
 label_172_v75:
 .space 4
 .align 2
-label_160_v68:
+label_108_v47:
 .space 4
 .align 2
-label_93_v39:
-.space 4
-.align 2
-label_177_v78:
-.space 4
-.align 2
-label_170_v74:
-.space 4
-.align 2
-label_147_v61:
-.space 4
-.align 2
-label_120_v50:
-.space 4
-.align 2
-label_103_v44:
-.space 4
-.align 2
-label_132_v53:
+label_151_v63:
 .space 4
 .align 2
 label_161_v69:
 .space 4
 .align 2
+label_181_v80:
+.space 4
+.align 2
+label_103_v44:
+.space 4
+.align 2
+label_163_v70:
+.space 4
+.align 2
+label_168_v73:
+.space 4
+.align 2
+label_133_v46:
+.space 4
+.align 2
+label_167_v72:
+.space 4
+.align 2
+label_177_v78:
+.space 4
+.align 2
+label_146_v60:
+.space 4
+.align 2
+label_140_v57:
+.space 4
+.align 2
+label_158_v67:
+.space 4
+.align 2
+label_132_v53:
+.space 4
+.align 2
+label_147_v61:
+.space 4
+.align 2
+label_175_v77:
+.space 4
+.align 2
+label_182_v81:
+.space 4
+.align 2
+label_97_v41:
+.space 4
+.align 2
+label_135_v54:
+.space 4
+.align 2
 label_112_v48:
+.space 4
+.align 2
+label_93_v39:
+.space 4
+.align 2
+label_156_v66:
+.space 4
+.align 2
+label_137_v55:
+.space 4
+.align 2
+label_149_v62:
+.space 4
+.align 2
+label_165_v71:
+.space 4
+.align 2
+label_99_v42:
+.space 4
+.align 2
+label_154_v65:
+.space 4
+.align 2
+label_174_v76:
+.space 4
+.align 2
+label_142_v58:
+.space 4
+.align 2
+label_160_v68:
+.space 4
+.align 2
+label_153_v64:
+.space 4
+.align 2
+label_179_v79:
+.space 4
+.align 2
+label_124_v51:
+.space 4
+.align 2
+label_170_v74:
+.space 4
+.align 2
+label_95_v40:
+.space 4
+.align 2
+label_101_v43:
+.space 4
+.align 2
+label_144_v59:
+.space 4
+.align 2
+label_91_v38:
 .space 4
 
 .text
@@ -651,8 +651,8 @@ lw $t5,0($t5)
 sw $t5,0($sp)
 # Original instruction: jal make_pair
 jal make_pair
-# Original instruction: addiu $sp,$sp,32
-addiu $sp,$sp,32
+# Original instruction: addiu $sp,$sp,56
+addiu $sp,$sp,56
 # Original instruction: add v45,$a0,$zero
 add $t5,$a0,$zero
 la $t0,label_130_v45

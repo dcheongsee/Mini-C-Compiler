@@ -59,10 +59,16 @@ public class FunCodeGen extends CodeGen {
         asmProg.getCurrentTextSection().emit(retLabel);
 
         if (fd.type instanceof StructType) {
-            VarDecl retDecl = fd.block.vds.get(0);
+            System.out.println("Function '" + fd.name + "' returns a struct. Searching for designated return variable...");
+            VarDecl retDecl = findReturnVarDecl(fd);
+            if (retDecl == null) {
+                throw new RuntimeException("No designated return variable found for function " + fd.name);
+            }
+            System.out.println("Using return variable '" + retDecl.name + "' at offset " + retDecl.offset + " for struct return.");
             Register localResult = Register.Virtual.create();
             asmProg.getCurrentTextSection().emit(OpCode.ADDIU, localResult, Register.Arch.fp, retDecl.offset);
             int structSize = getSize(fd.type);
+            System.out.println("Copying struct of size " + structSize + " from offset " + retDecl.offset + " into $a0");
             emitStructCopy(localResult, Register.Arch.a0, structSize);
         }
 
@@ -186,6 +192,26 @@ public class FunCodeGen extends CodeGen {
         return null;
     }
 
+    private VarDecl findReturnVarDecl(FunDef fd) {
+        if (!(fd.type instanceof StructType)) {
+            System.out.println("Function '" + fd.name + "' does not return a struct.");
+            return null;
+        }
+        StructType retType = (StructType) fd.type;
+        System.out.println("Looking for a local variable with struct type '" + retType.name + "' in function '" + fd.name + "'.");
+        for (VarDecl vd : fd.block.vds) {
+            if (!vd.isParameter && vd.type instanceof StructType) {
+                StructType localType = (StructType) vd.type;
+                System.out.println("Checking local variable '" + vd.name + "' with type '" + localType.name + "' and offset " + vd.offset);
+                if (localType.name.equals(retType.name)) { // compare names
+                    System.out.println("Matched return variable: '" + vd.name + "' with offset " + vd.offset);
+                    return vd;
+                }
+            }
+        }
+        System.out.println("No matching return variable found for function '" + fd.name + "'.");
+        return null;
+    }
 
 
 

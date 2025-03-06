@@ -262,15 +262,22 @@ public class ExprValCodeGen extends CodeGen {
                     yield handleBuiltinCall(fc);
                 } else {
                     boolean structReturn = isStructReturn(fc);
-                    int extraArgs = structReturn ? 1 : 0;
                     int totalArgSize = 0;
-                    // push args in reverse order
+                    if (structReturn) {
+                        int retSize = getSize(fc.decl.type);
+                        System.out.println("Function call to struct-returning function '" + fc.name +
+                                "': allocating " + retSize + " bytes for return value.");
+                        // allocate space on stack for return struct
+                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -retSize);
+                        asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.a0, Register.Arch.sp, Register.Arch.zero);
+                        totalArgSize += retSize;
+                    }
+                    // push explicit args in reverse order
                     for (int i = fc.args.size() - 1; i >= 0; i--) {
                         Expr argExpr = fc.args.get(i);
                         Type argType = argExpr.type;
                         if (argType instanceof StructType) {
                             int structSize = getSize(argType);
-                            // for each word in struct, load it from the arg's address and push it
                             Register structAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(argExpr);
                             for (int off = structSize - 4; off >= 0; off -= 4) {
                                 Register temp = Register.Virtual.create();
@@ -286,12 +293,16 @@ public class ExprValCodeGen extends CodeGen {
                             totalArgSize += 4;
                         }
                     }
+                    System.out.println("Total argument space pushed (including hidden return slot if any): " + totalArgSize);
                     asmProg.getCurrentTextSection().emit(OpCode.JAL, Label.get(fc.name));
-                    // pop args, totalArgSize now accounts for the full struct sizes
-                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, totalArgSize + extraArgs * 4);
-                    // retrieve result
+                    // after returning pop the args
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, totalArgSize);
                     Register result = Register.Virtual.create();
                     if (structReturn) {
+                        System.out.println("Struct-returning function '" + fc.name +
+                                "' call: retrieving return value from hidden slot in $a0.");
+                        // here callee’s epilog should have copied struct into memory
+                        // return that address as the result
                         asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.a0, Register.Arch.zero);
                     } else {
                         asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.v0, Register.Arch.zero);

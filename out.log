@@ -1,11 +1,5 @@
 java.lang.Throwable:
-gen.ExprValCodeGen.visit(ExprValCodeGen.java:84)
-gen.ExprValCodeGen.visit(ExprValCodeGen.java:155)
-gen.StmtCodeGen.visit(StmtCodeGen.java:37)
-gen.StmtCodeGen.visit(StmtCodeGen.java:28)
-gen.StmtCodeGen.visit(StmtCodeGen.java:55)
-gen.StmtCodeGen.visit(StmtCodeGen.java:28)
-gen.FunCodeGen.visit(FunCodeGen.java:57)
+gen.FunCodeGen.visit(FunCodeGen.java:66)
 gen.ProgramCodeGen.lambda$generate$0(ProgramCodeGen.java:26)
 java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
 gen.ProgramCodeGen.generate(ProgramCodeGen.java:22)
