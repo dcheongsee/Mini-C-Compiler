@@ -72,8 +72,15 @@ public class StmtCodeGen extends CodeGen {
             }
             case Return r -> {
                 if (r.expr != null) {
-                    Register retVal = new ExprValCodeGen(asmProg, astRoot).visit(r.expr);
-                    asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.v0, retVal, Register.Arch.zero);
+                    if (r.expr.type instanceof StructType) {
+                        // for struct returns, evaluate expression to get its address
+                        Register structAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(r.expr);
+                        int structSize = getSize(r.expr.type);
+                        emitStructCopy(structAddr, Register.Arch.a0, structSize);
+                    } else {
+                        Register retVal = new ExprValCodeGen(asmProg, astRoot).visit(r.expr);
+                        asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.v0, retVal, Register.Arch.zero);
+                    }
                 }
                 if (returnLabel == null) {
                     throw new RuntimeException("Return label not set");
@@ -89,4 +96,114 @@ public class StmtCodeGen extends CodeGen {
             }
         }
     }
+    // computes size in bytes of given type
+    private int getSize(Type type) {
+        if (type instanceof BaseType bt) {
+            return switch (bt) {
+                case INT -> 4;
+                case CHAR -> 1;
+                default -> 0;
+            };
+        } else if (type instanceof PointerType) {
+            return 4;
+        } else if (type instanceof ArrayType at) {
+            return getSize(at.elementType) * at.length;
+        } else if (type instanceof StructType st) {
+            return computeStructSize(st);
+        }
+        return 0;
+    }
+
+    // computes total size of a struct type using its decl
+    private int computeStructSize(StructType st) {
+        StructTypeDecl decl = lookupStructDecl(st.name);
+        if (decl == null) {
+            throw new RuntimeException("Struct not found: " + st.name);
+        }
+        int offset = 0;
+        int maxAlign = 1;
+        for (Decl field : decl.getFields()) {
+            if (field instanceof VarDecl vd) {
+                int size = getSize(vd.type);
+                int align = getAlignment(vd.type);
+                offset = alignTo(offset, align);
+                offset += size;
+                if (align > maxAlign) {
+                    maxAlign = align;
+                }
+            }
+        }
+        // now force struct’s alignment to at least 4
+        maxAlign = Math.max(4, maxAlign);
+        // then align the final offset too
+        offset = alignTo(offset, maxAlign);
+        return offset;
+    }
+
+    // computes alignment requirement for a type
+    private int getAlignment(Type type) {
+        if (type instanceof BaseType bt) {
+            return switch (bt) {
+                case INT -> 4;
+                case CHAR -> 1;
+                default -> 1;
+            };
+        } else if (type instanceof PointerType) {
+            return 4;
+        } else if (type instanceof ArrayType at) {
+            return getAlignment(at.elementType);
+        } else if (type instanceof StructType st) {
+            StructTypeDecl decl = lookupStructDecl(st.name);
+            if (decl == null) return 1;
+
+            int maxAlign = 1;
+            for (Decl field : decl.getFields()) {
+                if (field instanceof VarDecl vd) {
+                    int align = getAlignment(vd.type);
+                    if (align > maxAlign) {
+                        maxAlign = align;
+                    }
+                }
+            }
+            // force struct alignment to at least 4
+            maxAlign = Math.max(4, maxAlign);
+
+            return maxAlign;
+        }
+
+        return 1;
+    }
+
+    // aligns value to the next multiple of alignment
+    private int alignTo(int value, int alignment) {
+        if (alignment <= 1) return value;
+        return ((value + alignment - 1) / alignment) * alignment;
+    }
+
+    // looks up struct decl from the global AST
+    private StructTypeDecl lookupStructDecl(String structName) {
+        for (Decl d : sem.SemanticAnalyzer.GlobalAST.decls) {
+            if (d instanceof StructTypeDecl std && std.getName().equals(structName)) {
+                return std;
+            }
+        }
+        return null;
+    }
+
+    // copies memory from src to dest, word by word and then any remaining bytes
+    private void emitStructCopy(Register src, Register dest, int size) {
+        int words = size / 4;
+        int remainder = size % 4;
+        for (int i = 0; i < words; i++) {
+            Register temp = Register.Virtual.create();
+            asmProg.getCurrentTextSection().emit(OpCode.LW, temp, src, i * 4);
+            asmProg.getCurrentTextSection().emit(OpCode.SW, temp, dest, i * 4);
+        }
+        for (int i = words * 4; i < size; i++) {
+            Register temp = Register.Virtual.create();
+            asmProg.getCurrentTextSection().emit(OpCode.LB, temp, src, i);
+            asmProg.getCurrentTextSection().emit(OpCode.SB, temp, dest, i);
+        }
+    }
+
 }

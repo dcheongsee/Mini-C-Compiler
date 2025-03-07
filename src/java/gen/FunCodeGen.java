@@ -58,22 +58,9 @@ public class FunCodeGen extends CodeGen {
         // epilog, emit return label then restore $ra
         asmProg.getCurrentTextSection().emit(retLabel);
 
-        if (fd.type instanceof StructType) {
-            System.out.println("Function '" + fd.name + "' returns a struct. Searching for designated return variable...");
-            VarDecl retDecl = findReturnVarDecl(fd);
-            if (retDecl == null) {
-                throw new RuntimeException("No designated return variable found for function " + fd.name);
-            }
-            System.out.println("Using return variable '" + retDecl.name + "' at offset " + retDecl.offset + " for struct return.");
-            Register localResult = Register.Virtual.create();
-            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, localResult, Register.Arch.fp, retDecl.offset);
-            int structSize = getSize(fd.type);
-            System.out.println("Copying struct of size " + structSize + " from offset " + retDecl.offset + " into $a0");
-            emitStructCopy(localResult, Register.Arch.a0, structSize);
-        }
 
         if (alignedLocalSpace > 0) {
-            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, localSpace);
+            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, alignedLocalSpace);
         }
 
         asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.ra, Register.Arch.sp, 0);
@@ -158,11 +145,14 @@ public class FunCodeGen extends CodeGen {
                 }
             }
         }
+        // force struct alignment to at least 4
+        maxAlign = Math.max(4, maxAlign);
         return maxAlign;
     }
 
     private int computeStructSize(StructTypeDecl decl) {
-        int offset = 0, maxAlign = 1;
+        int offset = 0;
+        int maxAlign = 1;
         for (Decl field : decl.getFields()) {
             if (field instanceof VarDecl vd) {
                 int size = getSize(vd.type);
@@ -174,7 +164,11 @@ public class FunCodeGen extends CodeGen {
                 }
             }
         }
-        return alignTo(offset, maxAlign);
+        // now force struct’s alignment to at least 4
+        maxAlign = Math.max(4, maxAlign);
+        // then align the final offset too
+        offset = alignTo(offset, maxAlign);
+        return offset;
     }
 
     private int computeStructSize(StructType st) {

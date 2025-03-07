@@ -158,21 +158,27 @@ public class ExprAddrCodeGen extends CodeGen {
     }
 
     // calculates total size of a struct with alignment
-    private int computeStructSize(StructTypeDecl std) {
+    private int computeStructSize(StructTypeDecl decl) {
         int offset = 0;
         int maxAlign = 1;
-        for (Decl field : std.getFields()) {
+        for (Decl field : decl.getFields()) {
             if (field instanceof VarDecl vd) {
                 int size = getSize(vd.type);
                 int align = getAlignment(vd.type);
                 offset = alignTo(offset, align);
                 offset += size;
-                if (align > maxAlign) maxAlign = align;
+                if (align > maxAlign) {
+                    maxAlign = align;
+                }
             }
         }
+        // now force struct’s alignment to at least 4
+        maxAlign = Math.max(4, maxAlign);
+        // then align the final offset too
         offset = alignTo(offset, maxAlign);
         return offset;
     }
+
 
     // compute alignment
     private int getAlignment(Type type) {
@@ -188,16 +194,21 @@ public class ExprAddrCodeGen extends CodeGen {
             return getAlignment(at.elementType);
         } else if (type instanceof StructType st) {
             StructTypeDecl decl = structDecls.get(st.name);
-            if (decl == null) return 1;
+            if (decl == null) return 4; // at least 4
             int maxAlign = 1;
             for (Decl f : decl.getFields()) {
                 if (f instanceof VarDecl vd) {
                     int align = getAlignment(vd.type);
-                    if (align > maxAlign) maxAlign = align;
+                    if (align > maxAlign) {
+                        maxAlign = align;
+                    }
                 }
             }
+            // force struct alignment to at least 4
+            maxAlign = Math.max(4, maxAlign);
             return maxAlign;
         }
+
         return 1;
     }
 

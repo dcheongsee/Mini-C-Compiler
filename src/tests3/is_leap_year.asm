@@ -19,13 +19,22 @@ str_1473121480:
 .asciiz "Not leap year"
 # Allocated labels for virtual registers
 .align 2
-label_90_v35:
+label_71_v25:
 .space 4
 .align 2
 label_38_v9:
 .space 4
 .align 2
-label_58_v20:
+label_92_v36:
+.space 4
+.align 2
+label_86_v33:
+.space 4
+.align 2
+label_79_v28:
+.space 4
+.align 2
+label_78_v29:
 .space 4
 .align 2
 label_64_v18:
@@ -34,40 +43,37 @@ label_64_v18:
 label_61_v22:
 .space 4
 .align 2
-label_20_v0:
+label_42_v11:
 .space 4
 .align 2
-label_44_v12:
-.space 4
-.align 2
-label_66_v23:
+label_90_v35:
 .space 4
 .align 2
 label_33_v7:
 .space 4
 .align 2
-label_71_v25:
+label_40_v6:
 .space 4
 .align 2
-label_31_v4:
+label_66_v23:
 .space 4
 .align 2
-label_78_v29:
+label_82_v32:
 .space 4
 .align 2
-label_92_v36:
+label_57_v19:
+.space 4
+.align 2
+label_72_v26:
 .space 4
 .align 2
 label_54_v17:
 .space 4
 .align 2
-label_40_v6:
+label_23_v1:
 .space 4
 .align 2
-label_42_v11:
-.space 4
-.align 2
-label_57_v19:
+label_37_v10:
 .space 4
 .align 2
 label_81_v31:
@@ -76,71 +82,83 @@ label_81_v31:
 label_85_v34:
 .space 4
 .align 2
-label_23_v1:
-.space 4
-.align 2
-label_24_v2:
+label_62_v21:
 .space 4
 .align 2
 label_48_v14:
 .space 4
 .align 2
-label_82_v32:
+label_31_v4:
+.space 4
+.align 2
+label_20_v0:
 .space 4
 .align 2
 label_30_v5:
 .space 4
 .align 2
-label_37_v10:
+label_55_v16:
 .space 4
 .align 2
-label_72_v26:
+label_44_v12:
 .space 4
 .align 2
-label_86_v33:
+label_24_v2:
+.space 4
+.align 2
+label_58_v20:
+.space 4
+.align 2
+label_88_v30:
 .space 4
 .align 2
 label_68_v24:
 .space 4
 .align 2
-label_79_v28:
-.space 4
-.align 2
 label_47_v13:
-.space 4
-.align 2
-label_55_v16:
-.space 4
-.align 2
-label_62_v21:
-.space 4
-.align 2
-label_88_v30:
 .space 4
 .align 2
 label_34_v8:
 .space 4
 # Allocated labels for virtual registers
 .align 2
+label_124_v52:
+.space 4
+.align 2
+label_117_v48:
+.space 4
+.align 2
+label_94_v37:
+.space 4
+.align 2
+label_122_v51:
+.space 4
+.align 2
+label_119_v45:
+.space 4
+.align 2
+label_109_v44:
+.space 4
+.align 2
+label_113_v47:
+.space 4
+.align 2
+label_116_v49:
+.space 4
+.align 2
+label_98_v39:
+.space 4
+.align 2
 label_125_v53:
 .space 4
 .align 2
-label_101_v41:
+label_103_v42:
 .space 4
 .align 2
 label_110_v43:
 .space 4
 .align 2
-label_95_v38:
-.space 4
-.align 2
 label_121_v50:
-.space 4
-.align 2
-label_124_v52:
-.space 4
-.align 2
-label_94_v37:
 .space 4
 .align 2
 label_112_v46:
@@ -149,32 +167,17 @@ label_112_v46:
 label_99_v40:
 .space 4
 .align 2
-label_98_v39:
+label_101_v41:
 .space 4
 .align 2
-label_116_v49:
-.space 4
-.align 2
-label_119_v45:
-.space 4
-.align 2
-label_103_v42:
-.space 4
-.align 2
-label_122_v51:
-.space 4
-.align 2
-label_113_v47:
-.space 4
-.align 2
-label_117_v48:
-.space 4
-.align 2
-label_109_v44:
+label_95_v38:
 .space 4
 
 .text
 is_leap:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)
@@ -456,6 +459,9 @@ jr $ra
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)

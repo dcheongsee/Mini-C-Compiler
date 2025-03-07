@@ -95,17 +95,30 @@ public class ExprValCodeGen extends CodeGen {
 
             // FieldAccess, address, load
             case FieldAccessExpr fa -> {
-                Register addr = addrGen.visit(fa);
-                Register result = Register.Virtual.create();
-                // figure out the field's type if needed
+                Register baseAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(fa.expr);
+                // find VarDecl for that field
                 VarDecl fieldDecl = findFieldDecl(fa.expr.type, fa.field);
-                Type fieldType = (fieldDecl != null) ? fieldDecl.type : BaseType.UNKNOWN;
-                if (isCharType(fieldType)) {
-                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, addr, 0);
+                Type fieldType = fieldDecl.type;
+
+                if (fieldType instanceof ArrayType) {
+                    // we already have addressOfStruct in baseAddr
+                    int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                    Register arrayPtr = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, arrayPtr, baseAddr, fieldOffset);
+                    fa.type = new PointerType(((ArrayType) fieldType).elementType);
+                    yield arrayPtr;
                 } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, addr, 0);
+                    // normal (non-array) field to load with LB or LW
+                    int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                    Register result = Register.Virtual.create();
+                    if (isCharType(fieldType)) {
+                        asmProg.getCurrentTextSection().emit(OpCode.LB, result, baseAddr, fieldOffset);
+                    } else {
+                        asmProg.getCurrentTextSection().emit(OpCode.LW, result, baseAddr, fieldOffset);
+                    }
+                    fa.type = fieldType;
+                    yield result;
                 }
-                yield result;
             }
 
             // ValueAt, *pointer, get pointer value then LB/LW from that pointer
@@ -261,17 +274,22 @@ public class ExprValCodeGen extends CodeGen {
                 if (isBuiltin(fc.name)) {
                     yield handleBuiltinCall(fc);
                 } else {
-                    boolean structReturn = isStructReturn(fc);
                     int totalArgSize = 0;
+                    boolean structReturn = isStructReturn(fc);
                     if (structReturn) {
+                        // get raw struct size
                         int retSize = getSize(fc.decl.type);
-                        System.out.println("Function call to struct-returning function '" + fc.name +
-                                "': allocating " + retSize + " bytes for return value.");
-                        // allocate space on stack for return struct
+                        // round up to multiple of 4 so we store with LW/SW safely
+                        retSize = alignTo(retSize, 4);
+
                         asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -retSize);
+
+                        // set $a0 to point to that allocated space
                         asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.a0, Register.Arch.sp, Register.Arch.zero);
+
                         totalArgSize += retSize;
                     }
+
                     // push explicit args in reverse order
                     for (int i = fc.args.size() - 1; i >= 0; i--) {
                         Expr argExpr = fc.args.get(i);
@@ -559,4 +577,28 @@ public class ExprValCodeGen extends CodeGen {
         return BaseType.UNKNOWN;
     }
 
+    private int getFieldOffset(Type structType, String fieldName) {
+        if (!(structType instanceof StructType st)) {
+            throw new RuntimeException("Field access on non-struct type");
+        }
+        StructTypeDecl decl = structDecls.get(st.name);
+        if (decl == null) {
+            throw new RuntimeException("Struct " + st.name + " not found");
+        }
+        int offset = 0;
+        int maxAlign = 1;
+        for (Decl d : decl.getFields()) {
+            if (d instanceof VarDecl vd) {
+                int size = getSize(vd.type);
+                int align = getAlignment(vd.type);
+                offset = alignTo(offset, align);
+                if (vd.name.equals(fieldName)) {
+                    return offset;
+                }
+                offset += size;
+                if (align > maxAlign) maxAlign = align;
+            }
+        }
+        throw new RuntimeException("Field " + fieldName + " not found in struct " + st.name);
+    }
 }

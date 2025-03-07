@@ -71,18 +71,26 @@ public class MemAllocCodeGen extends CodeGen {
 
     // computes total size of a struct from its decl
     private int computeStructSize(StructTypeDecl decl) {
-        int offset = 0, maxAlign = 1;
+        int offset = 0;
+        int maxAlign = 1;
         for (Decl field : decl.getFields()) {
             if (field instanceof VarDecl vd) {
                 int size = getSize(vd.type);
                 int align = getAlignment(vd.type);
-                if (align > maxAlign) maxAlign = align;
                 offset = alignTo(offset, align);
                 offset += size;
+                if (align > maxAlign) {
+                    maxAlign = align;
+                }
             }
         }
-        return alignTo(offset, maxAlign);
+        // now force struct’s alignment to at least 4
+        maxAlign = Math.max(4, maxAlign);
+        // then align the final offset too
+        offset = alignTo(offset, maxAlign);
+        return offset;
     }
+
 
     // computes max alignment among struct fields
     private int computeStructAlignment(StructTypeDecl decl) {
@@ -90,11 +98,16 @@ public class MemAllocCodeGen extends CodeGen {
         for (Decl field : decl.getFields()) {
             if (field instanceof VarDecl vd) {
                 int align = getAlignment(vd.type);
-                if (align > maxAlign) maxAlign = align;
+                if (align > maxAlign) {
+                    maxAlign = align;
+                }
             }
         }
+        // force every struct's alignment to be at least 4
+        maxAlign = Math.max(4, maxAlign);
         return maxAlign;
     }
+
 
     public void visit(ASTNode n) {
         // for the Program node, process its decls only.

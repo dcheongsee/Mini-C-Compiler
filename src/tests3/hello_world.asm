@@ -11,19 +11,22 @@ global_s:
 .align 2
 global_i:
 .space 4
-str_1848160952:
-.asciiz "Hello, world!\r"
+str_1848160949:
+.asciiz "Hello, world!\n"
 # Allocated labels for virtual registers
 .align 2
-label_9_v1:
+label_8_v0:
 .space 4
 .align 2
-label_8_v0:
+label_9_v1:
 .space 4
 
 .text
 .globl main
 main:
+# Original instruction: andi $sp,$sp,-4
+andi $sp,$sp,-4
+# Align sp to word boundary
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
 # Original instruction: sw $fp,4($sp)
@@ -34,8 +37,8 @@ sw $ra,0($sp)
 add $fp,$sp,$zero
 # Original instruction: addiu $sp,$sp,-8
 addiu $sp,$sp,-8
-# Original instruction: la v0,str_1848160952
-la $t5,str_1848160952
+# Original instruction: la v0,str_1848160949
+la $t5,str_1848160949
 la $t0,label_8_v0
 sw $t5,0($t0)
 # Original instruction: add $a0,v0,$zero
