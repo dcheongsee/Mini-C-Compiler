@@ -134,7 +134,6 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					aa.type = at.elementType;
 					yield at.elementType;
 				} else if (arrayType instanceof PointerType pt) {
-					// for pointer types, the result is the pointer’s base type
 					aa.type = pt.base;
 					yield pt.base;
 				} else {
@@ -184,7 +183,9 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			}
 
 			case TypecastExpr tc -> {
-				yield visit(tc.castType);
+				Type innerType = visit(tc.expr);
+				tc.type = tc.castType;
+				yield tc.type;
 			}
 
 			case Assign assign -> {

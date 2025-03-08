@@ -74,6 +74,10 @@ public class ExprValCodeGen extends CodeGen {
 
             // ArrayAccess, address, load
             case ArrayAccessExpr aa -> {
+                // if the result is an array type, perform decay conversion i.e return its address
+                if (aa.type instanceof ArrayType) {
+                    yield new ExprAddrCodeGen(asmProg, astRoot).visit(aa);
+                }
                 Register addr = addrGen.visit(aa);
                 Register result = Register.Virtual.create();
                 Type elemType = null;
@@ -461,7 +465,9 @@ public class ExprValCodeGen extends CodeGen {
             return getSize(at.elementType) * at.length;
         } else if (type instanceof StructType st) {
             StructTypeDecl decl = structDecls.get(st.name);
-            if (decl == null) throw new RuntimeException("Struct not found: " + st.name);
+            if (decl == null) {
+                throw new RuntimeException("Unknown struct " + st.name);
+            }
             return computeStructSize(decl);
         }
         return 0;
@@ -476,11 +482,16 @@ public class ExprValCodeGen extends CodeGen {
                 int align = getAlignment(vd.type);
                 offset = alignTo(offset, align);
                 offset += size;
-                if (align > maxAlign) maxAlign = align;
+                if (align > maxAlign) {
+                    maxAlign = align;
+                }
             }
         }
-        return alignTo(offset, maxAlign);
+        maxAlign = Math.max(4, maxAlign);
+        offset = alignTo(offset, maxAlign);
+        return offset;
     }
+
 
     private int getAlignment(Type type) {
         if (type instanceof BaseType bt) {
@@ -495,17 +506,21 @@ public class ExprValCodeGen extends CodeGen {
             return getAlignment(at.elementType);
         } else if (type instanceof StructType st) {
             StructTypeDecl decl = structDecls.get(st.name);
+            if (decl == null) return 4; // at least 4
             int maxAlign = 1;
-            if (decl != null) {
-                for (Decl f : decl.getFields()) {
-                    if (f instanceof VarDecl vd) {
-                        int align = getAlignment(vd.type);
-                        if (align > maxAlign) maxAlign = align;
+            for (Decl f : decl.getFields()) {
+                if (f instanceof VarDecl vd) {
+                    int align = getAlignment(vd.type);
+                    if (align > maxAlign) {
+                        maxAlign = align;
                     }
                 }
             }
+            // force struct alignment to at least 4
+            maxAlign = Math.max(4, maxAlign);
             return maxAlign;
         }
+
         return 1;
     }
 
