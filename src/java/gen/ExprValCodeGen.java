@@ -56,43 +56,56 @@ public class ExprValCodeGen extends CodeGen {
                 if (vd == null) {
                     throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
                 }
-                // if the var's type is array, perform decay conversion
+                // if the variable is an array, perform decay conversion
                 if (vd.type instanceof ArrayType) {
+                    yield addrGen.visit(v);
+                }
+                // for struct types, do not load from memory—return the address
+                if (vd.type instanceof StructType) {
                     yield addrGen.visit(v);
                 }
                 Register addr = addrGen.visit(v);
                 Register result = Register.Virtual.create();
-                if (isCharType(v.vd.type)) {
+                if (isCharType(vd.type)) {
                     asmProg.getCurrentTextSection().emit(OpCode.LB, result, addr, 0);
                 } else {
                     asmProg.getCurrentTextSection().emit(OpCode.LW, result, addr, 0);
                 }
-                System.out.println("ExprValCodeGen: Loaded value for variable '" + v.name + "' from address " + addr);
                 yield result;
             }
 
 
             // ArrayAccess, address, load
             case ArrayAccessExpr aa -> {
-                // if the result is an array type, perform decay conversion i.e return its address
-                if (aa.type instanceof ArrayType) {
-                    yield new ExprAddrCodeGen(asmProg, astRoot).visit(aa);
+                // compute address of the array element
+                Register baseAddr = addrGen.visit(aa.array);
+                Register indexVal = new ExprValCodeGen(asmProg, astRoot).visit(aa.index);
+                int elemSize = getSizeOfArrayElement(aa.array.type);
+                Register sizeReg = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.LI, sizeReg, elemSize);
+                Register offsetReg = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.MUL, offsetReg, indexVal, sizeReg);
+                Register finalAddr = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.ADD, finalAddr, baseAddr, offsetReg);
+
+                // if element type is struct, return its address instead of loading a word
+                if (aa.type instanceof StructType) {
+                    yield finalAddr;
                 }
-                Register addr = addrGen.visit(aa);
+
                 Register result = Register.Virtual.create();
-                Type elemType = null;
+                Type elemType;
                 if (aa.array.type instanceof ArrayType at) {
                     elemType = at.elementType;
                 } else if (aa.array.type instanceof PointerType pt) {
                     elemType = pt.base;
-                }
-                if (elemType == null) {
+                } else {
                     throw new RuntimeException("ArrayAccess on non-array type or unknown elementType.");
                 }
                 if (isCharType(elemType)) {
-                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, addr, 0);
+                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, finalAddr, 0);
                 } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, addr, 0);
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, finalAddr, 0);
                 }
                 yield result;
             }
@@ -100,30 +113,38 @@ public class ExprValCodeGen extends CodeGen {
             // FieldAccess, address, load
             case FieldAccessExpr fa -> {
                 Register baseAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(fa.expr);
-                // find VarDecl for that field
+                int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+
+                // look up the field decl to determine its type
                 VarDecl fieldDecl = findFieldDecl(fa.expr.type, fa.field);
                 Type fieldType = fieldDecl.type;
 
+                // if field is an array, perform decay conversion
                 if (fieldType instanceof ArrayType) {
-                    // we already have addressOfStruct in baseAddr
-                    int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
                     Register arrayPtr = Register.Virtual.create();
                     asmProg.getCurrentTextSection().emit(OpCode.ADDIU, arrayPtr, baseAddr, fieldOffset);
                     fa.type = new PointerType(((ArrayType) fieldType).elementType);
                     yield arrayPtr;
-                } else {
-                    // normal (non-array) field to load with LB or LW
-                    int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
-                    Register result = Register.Virtual.create();
-                    if (isCharType(fieldType)) {
-                        asmProg.getCurrentTextSection().emit(OpCode.LB, result, baseAddr, fieldOffset);
-                    } else {
-                        asmProg.getCurrentTextSection().emit(OpCode.LW, result, baseAddr, fieldOffset);
-                    }
-                    fa.type = fieldType;
-                    yield result;
                 }
+
+                // if field is a struct, return its address
+                if (fieldType instanceof StructType) {
+                    Register fieldAddr = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, fieldAddr, baseAddr, fieldOffset);
+                    yield fieldAddr;
+                }
+
+                // otherwise for scalar types load value
+                Register result = Register.Virtual.create();
+                if (isCharType(fieldType)) {
+                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, baseAddr, fieldOffset);
+                } else {
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, baseAddr, fieldOffset);
+                }
+                fa.type = fieldType;
+                yield result;
             }
+
 
             // ValueAt, *pointer, get pointer value then LB/LW from that pointer
             case ValueAtExpr va -> {
@@ -615,5 +636,14 @@ public class ExprValCodeGen extends CodeGen {
             }
         }
         throw new RuntimeException("Field " + fieldName + " not found in struct " + st.name);
+    }
+
+    private int getSizeOfArrayElement(Type arrayType) {
+        if (arrayType instanceof ArrayType at) {
+            return getSize(at.elementType);
+        } else if (arrayType instanceof PointerType pt) {
+            return getSize(pt.base);
+        }
+        throw new RuntimeException("getSizeOfArrayElement called on non-array type");
     }
 }
