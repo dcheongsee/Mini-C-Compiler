@@ -78,7 +78,7 @@ public class ExprValCodeGen extends CodeGen {
             // ArrayAccess, address, load
             case ArrayAccessExpr aa -> {
                 // compute address of the array element
-                Register baseAddr = this.visit(aa.array);
+                Register baseAddr = addrGen.visit(aa.array);
                 Register indexVal = new ExprValCodeGen(asmProg, astRoot).visit(aa.index);
                 int elemSize = getSizeOfArrayElement(aa.array.type);
                 Register sizeReg = Register.Virtual.create();
