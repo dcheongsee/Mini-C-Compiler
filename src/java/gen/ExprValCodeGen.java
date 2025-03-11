@@ -78,7 +78,7 @@ public class ExprValCodeGen extends CodeGen {
             // ArrayAccess, address, load
             case ArrayAccessExpr aa -> {
                 // compute address of the array element
-                Register baseAddr = addrGen.visit(aa.array);
+                Register baseAddr = this.visit(aa.array);
                 Register indexVal = new ExprValCodeGen(asmProg, astRoot).visit(aa.index);
                 int elemSize = getSizeOfArrayElement(aa.array.type);
                 Register sizeReg = Register.Virtual.create();
@@ -192,67 +192,112 @@ public class ExprValCodeGen extends CodeGen {
 
             // BinOp, evaluate left & right, apply MIPS op, result
             case BinOp bin -> {
-                Register leftVal = visit(bin.left);
-                Register rightVal = visit(bin.right);
-                Register result = Register.Virtual.create();
-                switch (bin.op) {
-                    case ADD -> asmProg.getCurrentTextSection().emit(OpCode.ADD, result, leftVal, rightVal);
-                    case SUB -> asmProg.getCurrentTextSection().emit(OpCode.SUB, result, leftVal, rightVal);
-                    case MUL -> asmProg.getCurrentTextSection().emit(OpCode.MUL, result, leftVal, rightVal);
-                    case DIV -> {
-                        asmProg.getCurrentTextSection().emit(OpCode.DIV, leftVal, rightVal);
-                        Register quot = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.MFLO, quot);
-                        result = quot;
+                if (bin.op == Op.AND) {
+                    // short-circuit for &&
+                    Register leftVal = visit(bin.left);
+                    Label falseLabel = Label.create("and_false");
+                    Label endLabel = Label.create("and_end");
+                    // if left operand false, jump to falseLabel
+                    asmProg.getCurrentTextSection().emit(OpCode.BEQZ, leftVal, falseLabel);
+                    // left operand true, evaluate right operand
+                    Register rightVal = visit(bin.right);
+                    asmProg.getCurrentTextSection().emit(OpCode.BEQZ, rightVal, falseLabel);
+                    // both operands true, set result to 1
+                    Register result = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.LI, result, 1);
+                    asmProg.getCurrentTextSection().emit(OpCode.J, endLabel);
+                    // false case, set result to 0
+                    asmProg.getCurrentTextSection().emit(falseLabel);
+                    asmProg.getCurrentTextSection().emit(OpCode.LI, result, 0);
+                    asmProg.getCurrentTextSection().emit(endLabel);
+                    yield result;
+                } else if (bin.op == Op.OR) {
+                    // short-circuit for ||
+                    Register leftVal = visit(bin.left);
+                    Label trueLabel = Label.create("or_true");
+                    Label endLabel = Label.create("or_end");
+                    // if left operand true, jump to trueLabel
+                    asmProg.getCurrentTextSection().emit(OpCode.BNEZ, leftVal, trueLabel);
+                    // left operand false, evaluate right operand
+                    Register rightVal = visit(bin.right);
+                    asmProg.getCurrentTextSection().emit(OpCode.BNEZ, rightVal, trueLabel);
+                    // both operands false, set result to 0
+                    Register result = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.LI, result, 0);
+                    asmProg.getCurrentTextSection().emit(OpCode.J, endLabel);
+                    // true case, set result to 1
+                    asmProg.getCurrentTextSection().emit(trueLabel);
+                    asmProg.getCurrentTextSection().emit(OpCode.LI, result, 1);
+                    asmProg.getCurrentTextSection().emit(endLabel);
+                    yield result;
+                } else {
+                    // all other binary ops
+                    Register left = visit(bin.left);
+                    // save left operand on stack
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
+                    asmProg.getCurrentTextSection().emit(OpCode.SW, left, Register.Arch.sp, 0);
+                    Register right = visit(bin.right);
+                    Register leftTemp = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, leftTemp, Register.Arch.sp, 0);
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, 4);
+                    Register rightTemp = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.ADD, rightTemp, right, Register.Arch.zero);
+                    Register result = Register.Virtual.create();
+                    switch (bin.op) {
+                        case ADD:
+                            asmProg.getCurrentTextSection().emit(OpCode.ADD, result, leftTemp, rightTemp);
+                            break;
+                        case SUB:
+                            asmProg.getCurrentTextSection().emit(OpCode.SUB, result, leftTemp, rightTemp);
+                            break;
+                        case MUL:
+                            asmProg.getCurrentTextSection().emit(OpCode.MULT, leftTemp, rightTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.MFLO, result);
+                            break;
+                        case DIV:
+                            asmProg.getCurrentTextSection().emit(OpCode.DIV, leftTemp, rightTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.MFLO, result);
+                            break;
+                        case MOD:
+                            asmProg.getCurrentTextSection().emit(OpCode.DIV, leftTemp, rightTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.MFHI, result);
+                            break;
+                        case LT:
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, result, leftTemp, rightTemp);
+                            break;
+                        case GT:
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, result, rightTemp, leftTemp);
+                            break;
+                        case LE:
+                            Register tmpLE = Register.Virtual.create();
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, tmpLE, rightTemp, leftTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.XORI, result, tmpLE, 1);
+                            break;
+                        case GE:
+                            Register tmpGE = Register.Virtual.create();
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, tmpGE, leftTemp, rightTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.XORI, result, tmpGE, 1);
+                            break;
+                        case EQ:
+                            Register tmpEQ1 = Register.Virtual.create();
+                            Register tmpEQ2 = Register.Virtual.create();
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, tmpEQ1, leftTemp, rightTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, tmpEQ2, rightTemp, leftTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.OR, result, tmpEQ1, tmpEQ2);
+                            asmProg.getCurrentTextSection().emit(OpCode.XORI, result, result, 1);
+                            break;
+                        case NE:
+                            Register tmpNE1 = Register.Virtual.create();
+                            Register tmpNE2 = Register.Virtual.create();
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, tmpNE1, leftTemp, rightTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.SLT, tmpNE2, rightTemp, leftTemp);
+                            asmProg.getCurrentTextSection().emit(OpCode.OR, result, tmpNE1, tmpNE2);
+                            break;
+                        default:
+                            throw new UnsupportedOperationException("Unsupported binary operator: " + bin.op);
                     }
-                    case MOD -> {
-                        asmProg.getCurrentTextSection().emit(OpCode.DIV, leftVal, rightVal);
-                        Register rem = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.MFHI, rem);
-                        result = rem;
-                    }
-                    case LT -> asmProg.getCurrentTextSection().emit(OpCode.SLT, result, leftVal, rightVal);
-                    case GT -> asmProg.getCurrentTextSection().emit(OpCode.SLT, result, rightVal, leftVal);
-                    case LE -> {
-                        // left<=right => 1 - (right<left)
-                        Register tmp = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.SLT, tmp, rightVal, leftVal);
-                        Register one = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.LI, one, 1);
-                        asmProg.getCurrentTextSection().emit(OpCode.SUB, result, one, tmp);
-                    }
-                    case GE -> {
-                        // left>=right => 1 - (left<right)
-                        Register tmp = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.SLT, tmp, leftVal, rightVal);
-                        Register one = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.LI, one, 1);
-                        asmProg.getCurrentTextSection().emit(OpCode.SUB, result, one, tmp);
-                    }
-                    case EQ -> {
-                        Register tmp1 = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.SLT, tmp1, leftVal, rightVal);
-                        Register tmp2 = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.SLT, tmp2, rightVal, leftVal);
-                        Register tmpOr = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.OR, tmpOr, tmp1, tmp2);
-                        Register one = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.LI, one, 1);
-                        asmProg.getCurrentTextSection().emit(OpCode.SUB, result, one, tmpOr);
-                    }
-                    case NE -> {
-                        Register tmp1 = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.SLT, tmp1, leftVal, rightVal);
-                        Register tmp2 = Register.Virtual.create();
-                        asmProg.getCurrentTextSection().emit(OpCode.SLT, tmp2, rightVal, leftVal);
-                        asmProg.getCurrentTextSection().emit(OpCode.OR, result, tmp1, tmp2);
-                    }
-                    case AND -> asmProg.getCurrentTextSection().emit(OpCode.AND, result, leftVal, rightVal);
-                    case OR -> asmProg.getCurrentTextSection().emit(OpCode.OR, result, leftVal, rightVal);
-                    default ->
-                            throw new RuntimeException("Unsupported BinOp: " + bin.op);
+                    yield result;
                 }
-                yield result;
             }
 
             // IntLiteral, load immediate
