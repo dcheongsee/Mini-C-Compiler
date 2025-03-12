@@ -45,11 +45,11 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 				yield BaseType.NONE;
 			}
 			case VarDecl vd -> {
-				// type check the declared type
 				Type t = visit(vd.type);
 				if (t == BaseType.VOID) {
 					error("Variable " + vd.name + " cannot be declared void.");
 				}
+				vd.type = t;
 				yield t;
 			}
 			case VarExpr v -> {
@@ -244,9 +244,21 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 			}
 
 
-			case IntLiteral il -> BaseType.INT;
-			case ChrLiteral cl -> BaseType.CHAR;
-			case StrLiteral sl -> new ArrayType(BaseType.CHAR, sl.value.length() + 1);
+			case IntLiteral il -> {
+				il.type = BaseType.INT;
+				yield BaseType.INT;
+			}
+
+			case ChrLiteral cl -> {
+				cl.type = BaseType.CHAR;
+				yield BaseType.CHAR;
+			}
+
+			case StrLiteral sl -> {
+				ArrayType t = new ArrayType(BaseType.CHAR, sl.value.length() + 1);
+				sl.type = t;
+				yield t;
+			}
 
 			default -> {
 				for (ASTNode child : node.children()) {

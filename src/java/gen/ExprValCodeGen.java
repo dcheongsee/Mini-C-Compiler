@@ -77,18 +77,39 @@ public class ExprValCodeGen extends CodeGen {
 
             // ArrayAccess, address, load
             case ArrayAccessExpr aa -> {
-                // compute address of the array element
-                Register baseAddr = addrGen.visit(aa.array);
+                Register baseAddr;
+                if (aa.array instanceof VarExpr) {
+                    VarDecl vd = ((VarExpr) aa.array).vd;
+                    if (vd != null && vd.isParameter && vd.isArrayParam) {
+                        baseAddr = addrGen.visit(aa.array);
+                    } else {
+                        if (aa.array.type instanceof ArrayType) {
+                            baseAddr = addrGen.visit(aa.array);
+                        } else {
+                            baseAddr = new ExprValCodeGen(asmProg, astRoot).visit(aa.array);
+                        }
+                    }
+                } else {
+                    // for non varExpr cases check computed type
+                    if (aa.array.type instanceof ArrayType) {
+                        baseAddr = addrGen.visit(aa.array);
+                    } else {
+                        baseAddr = new ExprValCodeGen(asmProg, astRoot).visit(aa.array);
+                    }
+                }
+
+                // Compute the index’s value
                 Register indexVal = new ExprValCodeGen(asmProg, astRoot).visit(aa.index);
                 int elemSize = getSizeOfArrayElement(aa.array.type);
                 Register sizeReg = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.LI, sizeReg, elemSize);
                 Register offsetReg = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.MUL, offsetReg, indexVal, sizeReg);
+                // final address = base address + offset
                 Register finalAddr = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.ADD, finalAddr, baseAddr, offsetReg);
 
-                // if element type is struct, return its address instead of loading a word
+                // if element type is a struct return its address
                 if (aa.type instanceof StructType) {
                     yield finalAddr;
                 }
