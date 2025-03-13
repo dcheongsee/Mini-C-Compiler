@@ -56,12 +56,8 @@ public class ExprValCodeGen extends CodeGen {
                 if (vd == null) {
                     throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
                 }
-                // if the variable is an array, perform decay conversion
-                if (vd.type instanceof ArrayType) {
-                    yield addrGen.visit(v);
-                }
-                // for struct types, do not load from memory—return the address
-                if (vd.type instanceof StructType) {
+
+                if (vd.type instanceof ArrayType || vd.type instanceof StructType || (vd.isParameter && vd.isArrayParam)) {
                     yield addrGen.visit(v);
                 }
                 Register addr = addrGen.visit(v);
