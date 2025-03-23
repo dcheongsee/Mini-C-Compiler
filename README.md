@@ -8,7 +8,7 @@ We encourage you to regularly check this repository for changes.
 1. [Part 1 (parser)](description/part1/): Friday, 31 January 2025 at 5pm, weight = 20%
 2. [Part 2 (ast builder + semantic analyser)](description/part2/): Friday, 21 February 2025 at 5pm, weight = 20%
 3. [Part 3 (code generator)](description/part3/): Friday, 14 March 2025, at 5pm, weight = 20%
-4. Part 4 (register allocator): Friday 4 April 2025, at 5pm, weight = 20%
+4. [Part 4 (register allocator)](description/part4/): Friday 4 April 2025, at 5pm, weight = 20%
 5. Part 5 (object-oriented features): Friday 25 April 2025, at 5pm, weight = 20%
 
 Specific instructions for each part can be found above by clicking on the part name.
