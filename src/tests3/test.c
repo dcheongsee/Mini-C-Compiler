@@ -8,6 +8,13 @@ struct Data addOne(struct Data d) {
 }
 
 struct Data recurse(struct Data d, int n) {
+    // print the current state before processing the recursion step
+    print_s((char*)"Entering recurse: d.x = ");
+    print_i(d.x);
+    print_s((char*)", n = ");
+    print_i(n);
+    print_s((char*)"\n");
+
     if (n <= 0) {
         return d;
     }
@@ -16,8 +23,9 @@ struct Data recurse(struct Data d, int n) {
 
 void main() {
     struct Data d;
-    d.x = 0;
-    d = recurse(d, 10);
-    // Expected output: 10
+    d.x = 1;
+    d = recurse(d, 3);
+    // expected final output
+    print_s((char*)"Final d.x = ");
     print_i(d.x);
 }

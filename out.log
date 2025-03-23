@@ -1,10 +1,7 @@
 java.lang.Throwable:
 gen.ExprAddrCodeGen.visit(ExprAddrCodeGen.java:123)
-gen.ExprValCodeGen.pushArg(ExprValCodeGen.java:740)
-gen.ExprValCodeGen.visit(ExprValCodeGen.java:391)
-gen.StmtCodeGen.visit(StmtCodeGen.java:81)
-gen.StmtCodeGen.visit(StmtCodeGen.java:28)
-gen.StmtCodeGen.visit(StmtCodeGen.java:39)
+gen.ExprValCodeGen.visit(ExprValCodeGen.java:192)
+gen.StmtCodeGen.visit(StmtCodeGen.java:32)
 gen.StmtCodeGen.visit(StmtCodeGen.java:28)
 gen.FunCodeGen.visit(FunCodeGen.java:56)
 gen.ProgramCodeGen.lambda$generate$0(ProgramCodeGen.java:26)
