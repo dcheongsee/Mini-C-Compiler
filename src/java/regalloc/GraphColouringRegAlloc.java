@@ -121,8 +121,19 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         // sort vrs for consistent push/pop
         List<Register.Virtual> vrs = new ArrayList<>(map.keySet());
         vrs.sort(Comparator.comparing(Register.Virtual::toString));
-        // create labels for final spills
-        for (var v : vrs) {
+        // gather all virtual registers from the section
+        Set<Register.Virtual> allVRs = new HashSet<>();
+        for (var item : sec.items) {
+            if (item instanceof Instruction ins) {
+                for (var r : ins.registers()) {
+                    if (r instanceof Register.Virtual v) {
+                        allVRs.add(v);
+                    }
+                }
+            }
+        }
+        // create spill labels for every VR that is unmapped
+        for (var v : allVRs) {
             if (map.get(v) == null) {
                 Label l = Label.create("spill_final_" + v);
                 spills.put(v, l);
@@ -207,9 +218,19 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             ns.emit(OpCode.SW, dd, Register.Arch.t0, 0);
         } else if (d instanceof Register.Virtual dv2) {
             Register rd = map.get(dv2);
-            tmp = tmp.rebuild(Collections.singletonMap(dv2, rd));
-            ns.emit("orig " + ins);
-            ns.emit(tmp);
+            if (rd == null) { // mapping is null, so treat as spilled
+                Register tempDef = Register.Arch.t1;
+                tmp = tmp.rebuild(Collections.singletonMap(dv2, tempDef));
+                ns.emit("orig " + ins);
+                ns.emit(tmp);
+                // load the spill address and store the result into it
+                ns.emit(OpCode.LA, Register.Arch.t0, spills.get(dv2));
+                ns.emit(OpCode.SW, tempDef, Register.Arch.t0, 0);
+            } else {
+                tmp = tmp.rebuild(Collections.singletonMap(dv2, rd));
+                ns.emit("orig " + ins);
+                ns.emit(tmp);
+            }
         } else {
             ns.emit("orig " + ins);
             ns.emit(tmp);
