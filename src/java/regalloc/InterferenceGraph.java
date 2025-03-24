@@ -1,62 +1,107 @@
 package regalloc;
 
+import gen.asm.Instruction;
 import gen.asm.Register;
 
 import java.util.*;
 
-public final class InterferenceGraph {
+public class InterferenceGraph {
+    private Map<Register, Set<Register>> adjList;
+    private Map<Register, Register> coloring;
+    private Set<Register> spilled;
+    private static final int K = 16; // Number of available registers for coloring
+    private static final List<Register> PHYSICAL_REGISTERS = Arrays.asList(
+            Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
+            Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
+            Register.Arch.s0, Register.Arch.s1, Register.Arch.s2, Register.Arch.s3,
+            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
+    );
 
-    private final Map<Register.Virtual,Set<Register.Virtual>> adj = new HashMap<>();
-    private final Set<Register.Virtual> all = new HashSet<>();
+    public InterferenceGraph(ControlFlowGraph cfg) {
+        adjList = new HashMap<>();
+        coloring = new HashMap<>();
+        spilled = new HashSet<>();
 
-    public void build(CFGBuilder.CFG cfg) {
-        // gather all vrs
-        for (var n : cfg.nodes) {
-            all.addAll(n.in);
-            all.addAll(n.out);
-            if (n.def != null) all.add(n.def);
-            all.addAll(n.uses);
+        // collect all virtual registers
+        Set<Register> registers = new HashSet<>();
+        for (Instruction instr : cfg.getNodes()) {
+            registers.addAll(instr.uses());
+            if (instr.def() != null) registers.add(instr.def());
         }
-        // prepare adjacency sets
-        for (var v : all) {
-            adj.putIfAbsent(v, new HashSet<>());
+        for (Register r : registers) {
+            if (r.isVirtual()) adjList.put(r, new HashSet<>());
         }
-        // add edges for live sets
-        for (var n : cfg.nodes) {
-            var live = new HashSet<>(n.in);
-            live.addAll(n.out);
-            if (n.def != null) live.add(n.def);
-            var list = new ArrayList<>(live);
-            // every pair in live interferes
-            for (int i = 0; i < list.size(); i++) {
-                for (int j = i+1; j < list.size(); j++) {
-                    var a = list.get(i);
-                    var b = list.get(j);
-                    if (!a.equals(b)) {
-                        adj.get(a).add(b);
-                        adj.get(b).add(a);
-                    }
+
+        // build interference edges
+        for (Instruction instr : cfg.getNodes()) {
+            Set<Register> live = new HashSet<>(cfg.getLiveOut(instr));
+            for (Register r1 : live) {
+                if (!r1.isVirtual()) continue;
+                for (Register r2 : live) {
+                    if (!r2.isVirtual() || r1 == r2) continue;
+                    adjList.get(r1).add(r2);
+                    adjList.get(r2).add(r1);
                 }
             }
         }
     }
 
-    // measures degree ignoring removed vrs
-    public int degree(Register.Virtual v, Set<Register.Virtual> removed) {
-        int d = 0;
-        for (var x : adj.getOrDefault(v,Set.of())) {
-            if (!removed.contains(x)) d++;
+    public void color() {
+        Stack<Register> stack = new Stack<>();
+        Map<Register, Integer> degrees = new HashMap<>();
+
+        // initialize degrees
+        for (Register r : adjList.keySet()) {
+            degrees.put(r, adjList.get(r).size());
         }
-        return d;
+
+        // simplify: remove nodes with degree < K
+        while (!degrees.isEmpty()) {
+            Optional<Map.Entry<Register, Integer>> toRemove = degrees.entrySet().stream()
+                    .filter(e -> e.getValue() < K).findFirst();
+
+            if (toRemove.isPresent()) {
+                Register r = toRemove.get().getKey();
+                stack.push(r);
+                for (Register neighbor : adjList.get(r)) {
+                    if (degrees.containsKey(neighbor)) {
+                        degrees.put(neighbor, degrees.get(neighbor) - 1);
+                    }
+                }
+                degrees.remove(r);
+            } else {
+                // spill: remove node with highest degree
+                Register r = degrees.entrySet().stream()
+                        .max(Comparator.comparingInt(Map.Entry::getValue))
+                        .get().getKey();
+                spilled.add(r);
+                for (Register neighbor : adjList.get(r)) {
+                    if (degrees.containsKey(neighbor)) {
+                        degrees.put(neighbor, degrees.get(neighbor) - 1);
+                    }
+                }
+                degrees.remove(r);
+            }
+        }
+
+        // select: assign colors
+        while (!stack.isEmpty()) {
+            Register r = stack.pop();
+            Set<Register> usedColors = new HashSet<>();
+            for (Register neighbor : adjList.get(r)) {
+                if (coloring.containsKey(neighbor)) {
+                    usedColors.add(coloring.get(neighbor));
+                }
+            }
+            for (Register color : PHYSICAL_REGISTERS) {
+                if (!usedColors.contains(color)) {
+                    coloring.put(r, color);
+                    break;
+                }
+            }
+        }
     }
 
-    // neighbors of v
-    public Set<Register.Virtual> neighbors(Register.Virtual v) {
-        return adj.getOrDefault(v, Set.of());
-    }
-
-    // all vrs in graph
-    public Set<Register.Virtual> vertices() {
-        return all;
-    }
+    public Map<Register, Register> getColoring() { return coloring; }
+    public Set<Register> getSpilled() { return spilled; }
 }
