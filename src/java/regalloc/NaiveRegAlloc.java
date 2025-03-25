@@ -96,7 +96,6 @@ public final class NaiveRegAlloc implements AssemblyPass {
                 //AssemblyProgram.DataSection dataSec = newProg.newSection(AssemblyProgram.Section.Type.DATA);
                 newProg.dataSection.emit("Allocated labels for virtual registers");
                 vrMap.forEach((vr, lbl) -> {
-                    newProg.dataSection.emit(new Directive("align 2"));  // Ensure word alignment (2^2 = 4 bytes)
                     newProg.dataSection.emit(lbl);
                     newProg.dataSection.emit(new Directive("space " + 4));
                 });
