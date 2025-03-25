@@ -76,10 +76,43 @@ public class ControlFlowGraph {
                 }
             }
         } while (changed);
+        // handle dead defs, add defined register to liveOut if not present
+        for (Instruction instr : nodes) {
+            if (instr.def() != null && !liveOut.get(instr).contains(instr.def())) {
+                liveOut.get(instr).add(instr.def());
+            }
+        }
     }
 
     public List<Instruction> getNodes() { return nodes; }
     public Set<Instruction> getSuccessors(Instruction instr) { return successors.get(instr); }
     public Set<Register> getLiveIn(Instruction instr) { return liveIn.get(instr); }
     public Set<Register> getLiveOut(Instruction instr) { return liveOut.get(instr); }
+
+    // determines if an instruction is dead definition (and safe to remove)
+    public boolean isDead(Instruction instr) {
+        // only remove arithmetic instructions whose defined register is not live-out
+        if (instr.def() != null && !liveOut.get(instr).contains(instr.def())) {
+            return (instr instanceof Instruction.TernaryArithmetic ||
+                    instr instanceof Instruction.UnaryArithmetic ||
+                    instr instanceof Instruction.ArithmeticWithImmediate);
+        }
+        return false;
+    }
+
+    // output the CFG as a dot graph
+    public String toDot() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("digraph CFG {\n");
+        for (Instruction instr : nodes) {
+            String instrLabel = instr.toString().replace("\"", "\\\"");
+            sb.append("  \"").append(instrLabel).append("\";\n");
+            for (Instruction succ : successors.get(instr)) {
+                String succLabel = succ.toString().replace("\"", "\\\"");
+                sb.append("  \"").append(instrLabel).append("\" -> \"").append(succLabel).append("\";\n");
+            }
+        }
+        sb.append("}\n");
+        return sb.toString();
+    }
 }

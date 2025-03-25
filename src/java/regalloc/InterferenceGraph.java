@@ -9,7 +9,7 @@ public class InterferenceGraph {
     private Map<Register, Set<Register>> adjList;
     private Map<Register, Register> coloring;
     private Set<Register> spilled;
-    private static final int K = 16; // Number of available registers for coloring
+    private final int K; // number of available registers for coloring
     private static final List<Register> PHYSICAL_REGISTERS = Arrays.asList(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
             Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
@@ -17,7 +17,14 @@ public class InterferenceGraph {
             Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
     );
 
+    // default, use 16 registers
     public InterferenceGraph(ControlFlowGraph cfg) {
+        this(cfg, 16);
+    }
+
+    // constructor with parameterized K e.g. 14 if reserving spill registers
+    public InterferenceGraph(ControlFlowGraph cfg, int K) {
+        this.K = K;
         adjList = new HashMap<>();
         coloring = new HashMap<>();
         spilled = new HashSet<>();
@@ -55,7 +62,7 @@ public class InterferenceGraph {
             degrees.put(r, adjList.get(r).size());
         }
 
-        // simplify: remove nodes with degree < K
+        // simplify, remove nodes with degree < K
         while (!degrees.isEmpty()) {
             Optional<Map.Entry<Register, Integer>> toRemove = degrees.entrySet().stream()
                     .filter(e -> e.getValue() < K).findFirst();
@@ -70,7 +77,7 @@ public class InterferenceGraph {
                 }
                 degrees.remove(r);
             } else {
-                // spill: remove node with highest degree
+                // spill, remove node with highest degree
                 Register r = degrees.entrySet().stream()
                         .max(Comparator.comparingInt(Map.Entry::getValue))
                         .get().getKey();
@@ -84,7 +91,7 @@ public class InterferenceGraph {
             }
         }
 
-        // select: assign colors
+        // select, assign colors
         while (!stack.isEmpty()) {
             Register r = stack.pop();
             Set<Register> usedColors = new HashSet<>();
@@ -93,15 +100,42 @@ public class InterferenceGraph {
                     usedColors.add(coloring.get(neighbor));
                 }
             }
+            boolean colored = false;
             for (Register color : PHYSICAL_REGISTERS) {
                 if (!usedColors.contains(color)) {
                     coloring.put(r, color);
+                    colored = true;
                     break;
                 }
+            }
+            if (!colored) {
+                spilled.add(r);
             }
         }
     }
 
     public Map<Register, Register> getColoring() { return coloring; }
     public Set<Register> getSpilled() { return spilled; }
+
+    // for debug, output interference graph as dot graph
+    public String toDot() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("graph InterferenceGraph {\n");
+        for (Register r : adjList.keySet()) {
+            sb.append("  \"").append(r.toString()).append("\";\n");
+        }
+        Set<String> seen = new HashSet<>();
+        for (Register r : adjList.keySet()) {
+            for (Register neighbor : adjList.get(r)) {
+                String edge = r.toString() + "--" + neighbor.toString();
+                String reverseEdge = neighbor.toString() + "--" + r.toString();
+                if (!seen.contains(edge) && !seen.contains(reverseEdge)) {
+                    sb.append("  \"").append(r.toString()).append("\" -- \"").append(neighbor.toString()).append("\";\n");
+                    seen.add(edge);
+                }
+            }
+        }
+        sb.append("}\n");
+        return sb.toString();
+    }
 }
