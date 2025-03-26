@@ -11,6 +11,14 @@ public class GraphColouringRegAlloc implements AssemblyPass {
     // track spilled registers mapped to data labels
     private final Map<Register, Label> spilledLabelMap = new HashMap<>();
 
+    // define allowed physical registers for allocation (and for push/pop)
+    private static final List<Register> ALLOWED_REGS = List.of(
+            Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
+            Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
+            Register.Arch.s0, Register.Arch.s1, Register.Arch.s2, Register.Arch.s3,
+            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
+    );
+
     @Override
     public AssemblyProgram apply(AssemblyProgram program) {
         // create final program
@@ -47,6 +55,9 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                     break;
                 }
             }
+
+            // expand push/pop pseudo instructions in the currentItems
+            currentItems = expandPushPop(currentItems);
 
             // create final text section
             AssemblyProgram.TextSection newSection = newProg.emitNewTextSection();
@@ -164,5 +175,76 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             }
         }
         return out;
+    }
+
+
+    private List<AssemblyItem> expandPushPop(List<AssemblyItem> items) {
+        List<AssemblyItem> newItems = new ArrayList<>();
+        // first, compute set of physical registers (from ALLOWED_REGS) used in the function
+        Set<Register> usedPhysRegs = new HashSet<>();
+        for (AssemblyItem ai : items) {
+            if (ai instanceof Instruction instr) {
+                for (Register r : instr.registers()) {
+                    if (!r.isVirtual() && ALLOWED_REGS.contains(r)) {
+                        usedPhysRegs.add(r);
+                    }
+                }
+            }
+        }
+        // determine registers to push in a fixed order (as defined in ALLOWED_REGS)
+        List<Register> regsToPush = new ArrayList<>();
+        for (Register r : ALLOWED_REGS) {
+            if (usedPhysRegs.contains(r)) {
+                regsToPush.add(r);
+            }
+        }
+        int n = regsToPush.size(); // number of registers to push/pop
+
+        for (AssemblyItem ai : items) {
+            if (ai instanceof Instruction instr) {
+                // check if this is a push/pop pseudo instruction
+                if (instr instanceof Instruction.Nullary nullaryInstr) {
+                    if (nullaryInstr == Instruction.Nullary.pushRegisters) {
+                        // expand pushRegisters
+                        List<AssemblyItem> expansion = new ArrayList<>();
+                        if (n > 0) {
+                            // adjust stack pointer: addi $sp, $sp, -n*4
+                            expansion.add(new Instruction.ArithmeticWithImmediate(
+                                    OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, -n * 4));
+                            int offset = 0;
+                            for (Register r : regsToPush) {
+                                expansion.add(new Instruction.Store(
+                                        OpCode.SW, r, Register.Arch.sp, offset));
+                                offset += 4;
+                            }
+                        }
+                        newItems.addAll(expansion);
+                        continue;
+                    } else if (nullaryInstr == Instruction.Nullary.popRegisters) {
+                        // expand popRegisters
+                        List<AssemblyItem> expansion = new ArrayList<>();
+                        if (n > 0) {
+                            // pop registers in reverse order
+                            List<Register> reverseList = new ArrayList<>(regsToPush);
+                            Collections.reverse(reverseList);
+                            int offset = 0;
+                            for (Register r : reverseList) {
+                                expansion.add(new Instruction.Load(
+                                        OpCode.LW, r, Register.Arch.sp, offset));
+                                offset += 4;
+                            }
+                            // adjust stack pointer: addi $sp, $sp, n*4
+                            expansion.add(new Instruction.ArithmeticWithImmediate(
+                                    OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, n * 4));
+                        }
+                        newItems.addAll(expansion);
+                        continue;
+                    }
+                }
+            }
+            // for all other items, keep them unchanged
+            newItems.add(ai);
+        }
+        return newItems;
     }
 }

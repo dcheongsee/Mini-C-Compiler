@@ -14,7 +14,7 @@ public class ControlFlowGraph {
         public Set<Register> liveOut = new HashSet<>();
         public Set<BasicBlock> successors = new HashSet<>();
         public Set<BasicBlock> predecessors = new HashSet<>();
-        public String label; // Optional block label if available
+        public String label;
     }
 
     private final List<BasicBlock> blocks;
