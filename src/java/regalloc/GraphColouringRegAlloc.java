@@ -8,174 +8,161 @@ public class GraphColouringRegAlloc implements AssemblyPass {
 
     public static final GraphColouringRegAlloc INSTANCE = new GraphColouringRegAlloc();
 
-    // reserve two registers for spilled operand loads
-    private static final Register SPILL_REG1 = Register.Arch.t8;
-    private static final Register SPILL_REG2 = Register.Arch.t9;
-    // reserve third register solely for spilled def (used as temp for storing computed value into memory)
-    private static final Register SPILL_REG3 = Register.Arch.s7;
+    // track spilled registers mapped to data labels
+    private final Map<Register, Label> spilledLabelMap = new HashMap<>();
 
     @Override
     public AssemblyProgram apply(AssemblyProgram program) {
+        // create final program
         AssemblyProgram newProg = new AssemblyProgram();
 
-        // copy original data section
+        // copy original data items
         newProg.dataSection.items.addAll(program.dataSection.items);
 
-        // process each text section
+        // process each function
         for (AssemblyProgram.TextSection section : program.textSections) {
-            ControlFlowGraph cfg = new ControlFlowGraph(section.items);
-            cfg.computeLiveness();
+            // multi-pass rewriting in memory, then produce final text items
+            List<AssemblyItem> currentItems = new ArrayList<>(section.items);
 
-            // dump cfg dot if debugging is enabled
-            if (System.getProperty("debug.dot") != null) {
-                System.out.println("CFG DOT output:\n" + cfg.toDot());
-            }
+            boolean changed = true;
+            while (changed) {
+                changed = false;
+                // build CFG, liveness is computed in the constructor
+                ControlFlowGraph cfg = new ControlFlowGraph(currentItems);
 
-            // first allocation attempt with full registers
-            InterferenceGraph ig = new InterferenceGraph(cfg);
-            ig.color();
-
-            Map<Register, Register> coloring = ig.getColoring();
-            Set<Register> spilled = ig.getSpilled();
-
-            // if spilling, re-run allocation with reserved spill registers
-            if (!spilled.isEmpty()) {
-                System.out.println("Spilling detected. Re-running allocation with reserved spill registers.");
-                ig = new InterferenceGraph(cfg, 14); // reserve 2 registers for spilling
+                // build interference graph using the CFG (which now provides instruction-level liveness)
+                InterferenceGraph ig = new InterferenceGraph(cfg, 16);
                 ig.color();
-                coloring = ig.getColoring();
-                spilled = ig.getSpilled();
-            }
 
-            // allocate spill labels in data section
-            Map<Register, Label> spillLabels = new HashMap<>();
-            for (Register vr : spilled) {
-                Label label = Label.create("spill_" + vr.toString());
-                spillLabels.put(vr, label);
-                newProg.dataSection.emit(label);
-                newProg.dataSection.emit(new Directive("word 0"));
-            }
-
-            // patch instructions
-            AssemblyProgram.TextSection newSection = newProg.emitNewTextSection();
-            for (AssemblyItem item : section.items) {
-                if (item instanceof Instruction) {
-                    Instruction instr = (Instruction) item;
-                    // Skip dead arithmetic instructions
-                    if (cfg.isDead(instr)) {
-                        continue;
-                    }
-                    if (instr == Instruction.Nullary.pushRegisters) {
-                        expandPushRegisters(newSection, coloring.values());
-                    } else if (instr == Instruction.Nullary.popRegisters) {
-                        expandPopRegisters(newSection, coloring.values());
-                    } else {
-                        patchInstruction(newSection, instr, coloring, spillLabels);
-                    }
+                Set<Register> spills = ig.getSpilled();
+                if (!spills.isEmpty()) {
+                    // pick one register to rewrite
+                    Register toSpill = pickOneSpill(spills);
+                    currentItems = rewriteOneSpilledVR(currentItems, toSpill);
+                    changed = true;
                 } else {
-                    if (item instanceof AssemblyTextItem) {
-                        newSection.emit((AssemblyTextItem) item);
-                    } else {
-                        throw new IllegalArgumentException("Unsupported AssemblyItem type: " + item.getClass());
-                    }
+                    // patch final
+                    Map<Register, Register> coloring = ig.getColoring();
+                    currentItems = patchAll(currentItems, coloring);
+                    break;
                 }
             }
 
-            // dump interference graph dot if debugging enabled
-            if (System.getProperty("debug.dot") != null) {
-                InterferenceGraph igForDot = new InterferenceGraph(cfg, coloring.size() + spilled.size());
-                System.out.println("Interference Graph DOT output:\n" + igForDot.toDot());
+            // create final text section
+            AssemblyProgram.TextSection newSection = newProg.emitNewTextSection();
+            for (AssemblyItem ai : currentItems) {
+                if (ai instanceof Instruction instr) {
+                    newSection.emit(instr);
+                } else if (ai instanceof AssemblyTextItem ati) {
+                    newSection.emit(ati);
+                } else {
+                    throw new RuntimeException("unexpected item type: " + ai.getClass());
+                }
             }
+        }
+
+        // emit each spill label in data (to avoid .word in text)
+        for (Label lbl : spilledLabelMap.values()) {
+            newProg.dataSection.emit(lbl);
+            newProg.dataSection.emit(new Directive("word 0"));
         }
 
         return newProg;
     }
 
-
-    private void patchInstruction(AssemblyProgram.TextSection section, Instruction instr, Map<Register, Register> coloring, Map<Register, Label> spillLabels) {
-        Map<Register, Register> regMap = new HashMap<>();
-        int spilledUseCount = 0;
-        // handle uses, replace each spilled operand
-        for (Register r : instr.uses()) {
-            if (spillLabels.containsKey(r)) {
-                Label label = spillLabels.get(r);
-                // allow at most two spilled uses
-                if (spilledUseCount == 0) {
-                    // use SPILL_REG1 for first spilled use
-                    regMap.put(r, SPILL_REG1);
-                    section.emit(OpCode.LA, SPILL_REG1, label); // Load spill address.
-                    section.emit(OpCode.LW, SPILL_REG1, SPILL_REG1, 0); // Load value.
-                } else if (spilledUseCount == 1) {
-                    // use SPILL_REG2 for second spilled use
-                    regMap.put(r, SPILL_REG2);
-                    section.emit(OpCode.LA, SPILL_REG2, label);
-                    section.emit(OpCode.LW, SPILL_REG2, SPILL_REG2, 0);
-                } else {
-                    throw new RuntimeException("Instruction has more than 2 spilled operands, which should not happen.");
-                }
-                spilledUseCount++;
-            } else if (coloring.containsKey(r)) {
-                regMap.put(r, coloring.get(r));
+    // pick a single spilled register (stable tie-break)
+    private Register pickOneSpill(Set<Register> spilled) {
+        Register best = null;
+        for (Register r : spilled) {
+            if (best == null) {
+                best = r;
             } else {
-                regMap.put(r, r);
+                if (r.toString().compareTo(best.toString()) < 0) {
+                    best = r;
+                }
             }
         }
-        // handle def
-        Register def = instr.def();
-        if (def != null) {
-            if (spillLabels.containsKey(def)) {
-                // for spilled def, if no spilled use encountered, use SPILL_REG2;
-                // if one spilled use occurred, use SPILL_REG1
-                // if two spilled uses occurred, we reserve SPILL_REG3
-                if (spilledUseCount == 0) {
-                    regMap.put(def, SPILL_REG2);
-                } else if (spilledUseCount == 1) {
-                    regMap.put(def, SPILL_REG1);
-                } else if (spilledUseCount == 2) {
-                    regMap.put(def, SPILL_REG3);
+        return best;
+    }
+
+    // rewrite references to toSpill with loads/stores from a unique label
+    private List<AssemblyItem> rewriteOneSpilledVR(List<AssemblyItem> items, Register toSpill) {
+        Label spillLabel = spilledLabelMap.computeIfAbsent(toSpill, r -> Label.create("spill_" + r));
+        List<AssemblyItem> newItems = new ArrayList<>();
+
+        for (AssemblyItem ai : items) {
+            if (ai instanceof Instruction instr) {
+                List<Register> used = instr.uses();
+                Register d = instr.def();
+                boolean uses = used.contains(toSpill);
+                boolean defs = (d != null && d.equals(toSpill));
+
+                if (!uses && !defs) {
+                    newItems.add(ai);
                 } else {
-                    throw new RuntimeException("Unexpected number of spilled uses.");
+                    Register tmp = Register.Virtual.create();
+                    Map<Register, Register> regMap = new HashMap<>();
+                    if (uses) {
+                        newItems.add(new Comment("load spilled " + toSpill + " into " + tmp));
+                        newItems.addAll(buildLoadOps(tmp, spillLabel));
+                        for (Register ur : used) {
+                            if (ur.equals(toSpill)) {
+                                regMap.put(ur, tmp);
+                            }
+                        }
+                    }
+                    if (defs) {
+                        regMap.put(toSpill, tmp);
+                    }
+                    Instruction rebuilt = instr.rebuild(regMap);
+                    newItems.add(rebuilt);
+
+                    if (defs) {
+                        newItems.add(new Comment("store spilled " + toSpill + " from " + tmp));
+                        newItems.addAll(buildStoreOps(tmp, spillLabel));
+                    }
                 }
-            } else if (coloring.containsKey(def)) {
-                regMap.put(def, coloring.get(def));
             } else {
-                regMap.put(def, def);
+                newItems.add(ai);
             }
         }
-        // rebuild and emit patched instruction
-        Instruction patched = instr.rebuild(regMap);
-        section.emit(patched);
-
-        // for spilled defs, emit a store to update its spill slot
-        if (def != null && spillLabels.containsKey(def)) {
-            Label label = spillLabels.get(def);
-            // use temp to load spill slot address
-            section.emit(OpCode.LA, SPILL_REG3, label);
-            section.emit(OpCode.SW, regMap.get(def), SPILL_REG3, 0);
-        }
+        return newItems;
     }
 
-    private void expandPushRegisters(AssemblyProgram.TextSection section, Collection<Register> regs) {
-        int offset = 0;
-        for (Register r : regs) {
-            if (r == SPILL_REG1 || r == SPILL_REG2 || r == SPILL_REG3) continue;
-            section.emit(OpCode.SW, r, Register.Arch.sp, offset);
-            offset -= 4;
-        }
-        if (offset != 0) {
-            section.emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, offset);
-        }
+    // build a load sequence: la reg, spillLabel; lw reg, 0(reg)
+    private List<AssemblyItem> buildLoadOps(Register dst, Label lbl) {
+        List<AssemblyItem> ops = new ArrayList<>();
+        Register addr = Register.Virtual.create();
+        ops.add(new Instruction.LoadAddress(addr, lbl));
+        ops.add(new Instruction.Load(OpCode.LW, dst, addr, 0));
+        return ops;
     }
 
-    private void expandPopRegisters(AssemblyProgram.TextSection section, Collection<Register> regs) {
-        int offset = -4 * (regs.size() - 3); // adjust for reserved spill registers
-        for (Register r : regs) {
-            if (r == SPILL_REG1 || r == SPILL_REG2 || r == SPILL_REG3) continue;
-            section.emit(OpCode.LW, r, Register.Arch.sp, offset);
-            offset += 4;
+    // build a store sequence: la reg, spillLabel; sw src, 0(reg)
+    private List<AssemblyItem> buildStoreOps(Register src, Label lbl) {
+        List<AssemblyItem> ops = new ArrayList<>();
+        Register addr = Register.Virtual.create();
+        ops.add(new Instruction.LoadAddress(addr, lbl));
+        ops.add(new Instruction.Store(OpCode.SW, src, addr, 0));
+        return ops;
+    }
+
+    private List<AssemblyItem> patchAll(List<AssemblyItem> items, Map<Register, Register> coloring) {
+        List<AssemblyItem> out = new ArrayList<>();
+        for (AssemblyItem ai : items) {
+            if (ai instanceof Instruction instr) {
+                Map<Register, Register> regMap = new HashMap<>();
+                for (Register r : instr.registers()) {
+                    if (r.isVirtual() && coloring.containsKey(r)) {
+                        regMap.put(r, coloring.get(r));
+                    }
+                }
+                Instruction patched = instr.rebuild(regMap);
+                out.add(patched);
+            } else {
+                out.add(ai);
+            }
         }
-        if (offset != 0) {
-            section.emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -offset);
-        }
+        return out;
     }
 }

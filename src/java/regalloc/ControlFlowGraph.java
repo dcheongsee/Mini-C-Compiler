@@ -5,111 +5,243 @@ import gen.asm.*;
 import java.util.*;
 
 public class ControlFlowGraph {
-    private List<Instruction> nodes;
-    private Map<Instruction, Set<Instruction>> successors;
-    private Map<Instruction, Set<Register>> liveIn;
-    private Map<Instruction, Set<Register>> liveOut;
-    private Map<String, Instruction> labelToInstruction;
+
+    public static class BasicBlock {
+        public List<Instruction> instructions = new ArrayList<>();
+        public Set<Register> use = new HashSet<>();
+        public Set<Register> def = new HashSet<>();
+        public Set<Register> liveIn = new HashSet<>();
+        public Set<Register> liveOut = new HashSet<>();
+        public Set<BasicBlock> successors = new HashSet<>();
+        public Set<BasicBlock> predecessors = new HashSet<>();
+        public String label; // Optional block label if available
+    }
+
+    private final List<BasicBlock> blocks;
 
     public ControlFlowGraph(List<AssemblyItem> items) {
-        nodes = new ArrayList<>();
-        successors = new HashMap<>();
-        liveIn = new HashMap<>();
-        liveOut = new HashMap<>();
-        labelToInstruction = new HashMap<>();
-
-        // collect instructions and map labels
+        blocks = new ArrayList<>();
+        // build a linear sequence from items (keeping only labels and instructions)
+        List<Object> sequence = new ArrayList<>();
         for (AssemblyItem item : items) {
-            if (item instanceof Instruction) {
-                nodes.add((Instruction) item);
-                successors.put((Instruction) item, new HashSet<>());
-            } else if (item instanceof Label) {
-                labelToInstruction.put(((Label) item).name, nodes.isEmpty() ? null : nodes.get(nodes.size() - 1));
+            if (item instanceof Instruction || item instanceof Label) {
+                sequence.add(item);
             }
         }
-
-        // build CFG edges
-        for (int i = 0; i < nodes.size(); i++) {
-            Instruction instr = nodes.get(i);
-            Instruction next = (i + 1 < nodes.size()) ? nodes.get(i + 1) : null;
-            if (instr.opcode.kind() == OpCode.Kind.JUMP || instr.opcode == OpCode.JAL) {
-                String target = ((Instruction.Jump) instr).label.name;
-                Instruction targetInstr = labelToInstruction.get(target);
-                if (targetInstr != null) successors.get(instr).add(targetInstr);
-            } else if (instr.opcode.kind() == OpCode.Kind.BINARY_BRANCH) {
-                String target = ((Instruction.BinaryBranch) instr).label.name;
-                Instruction targetInstr = labelToInstruction.get(target);
-                if (targetInstr != null) successors.get(instr).add(targetInstr);
-                if (next != null) successors.get(instr).add(next);
-            } else if (next != null) {
-                successors.get(instr).add(next);
+        // determine leader indices: first instruction, any instruction following a jump/branch, and any target of a label
+        Set<Integer> leaderIndices = new HashSet<>();
+        for (int i = 0; i < sequence.size(); i++) {
+            Object obj = sequence.get(i);
+            if (obj instanceof Instruction) {
+                leaderIndices.add(i);
+                break;
             }
         }
-    }
-
-    public void computeLiveness() {
-        for (Instruction instr : nodes) {
-            liveIn.put(instr, new HashSet<>());
-            liveOut.put(instr, new HashSet<>());
-        }
-        boolean changed;
-        do {
-            changed = false;
-            for (int i = nodes.size() - 1; i >= 0; i--) {
-                Instruction instr = nodes.get(i);
-                Set<Register> oldLiveIn = new HashSet<>(liveIn.get(instr));
-                Set<Register> oldLiveOut = new HashSet<>(liveOut.get(instr));
-                Set<Register> newLiveOut = new HashSet<>();
-                for (Instruction succ : successors.get(instr)) {
-                    newLiveOut.addAll(liveIn.get(succ));
-                }
-                liveOut.put(instr, newLiveOut);
-                Set<Register> newLiveIn = new HashSet<>(instr.uses());
-                Set<Register> def = new HashSet<>();
-                if (instr.def() != null) def.add(instr.def());
-                for (Register r : newLiveOut) {
-                    if (!def.contains(r)) newLiveIn.add(r);
-                }
-                liveIn.put(instr, newLiveIn);
-                if (!oldLiveIn.equals(newLiveIn) || !oldLiveOut.equals(newLiveOut)) {
-                    changed = true;
+        for (int i = 0; i < sequence.size(); i++) {
+            Object obj = sequence.get(i);
+            if (obj instanceof Instruction instr) {
+                if (instr.opcode.kind() == OpCode.Kind.JUMP ||
+                        instr.opcode.kind() == OpCode.Kind.BINARY_BRANCH ||
+                        instr.opcode.kind() == OpCode.Kind.JUMP_REGISTER) {
+                    if (i + 1 < sequence.size() && sequence.get(i + 1) instanceof Instruction) {
+                        leaderIndices.add(i + 1);
+                    }
                 }
             }
-        } while (changed);
-        // handle dead defs, add defined register to liveOut if not present
-        for (Instruction instr : nodes) {
-            if (instr.def() != null && !liveOut.get(instr).contains(instr.def())) {
-                liveOut.get(instr).add(instr.def());
+        }
+        for (int i = 0; i < sequence.size(); i++) {
+            if (sequence.get(i) instanceof Label) {
+                if (i + 1 < sequence.size() && sequence.get(i + 1) instanceof Instruction) {
+                    leaderIndices.add(i + 1);
+                }
             }
         }
-    }
 
-    public List<Instruction> getNodes() { return nodes; }
-    public Set<Instruction> getSuccessors(Instruction instr) { return successors.get(instr); }
-    public Set<Register> getLiveIn(Instruction instr) { return liveIn.get(instr); }
-    public Set<Register> getLiveOut(Instruction instr) { return liveOut.get(instr); }
-
-    // determines if an instruction is dead definition (and safe to remove)
-    public boolean isDead(Instruction instr) {
-        // only remove arithmetic instructions whose defined register is not live-out
-        if (instr.def() != null && !liveOut.get(instr).contains(instr.def())) {
-            return (instr instanceof Instruction.TernaryArithmetic ||
-                    instr instanceof Instruction.UnaryArithmetic ||
-                    instr instanceof Instruction.ArithmeticWithImmediate);
+        // form basic blocks starting at leader indices
+        int i = 0;
+        while (i < sequence.size()) {
+            if (!leaderIndices.contains(i)) {
+                i++;
+                continue;
+            }
+            BasicBlock block = new BasicBlock();
+            // if the leader is a Label, record it and advance
+            if (sequence.get(i) instanceof Label lbl) {
+                block.label = lbl.name;
+                i++;
+            }
+            // add instructions until the next leader is encountered (unless the block is empty)
+            while (i < sequence.size() && (!(leaderIndices.contains(i)) || block.instructions.isEmpty())) {
+                Object obj = sequence.get(i);
+                if (obj instanceof Label lbl) {
+                    if (block.label == null) {
+                        block.label = lbl.name;
+                    }
+                } else if (obj instanceof Instruction instr) {
+                    block.instructions.add(instr);
+                    // end the block immediately if a jump/branch instruction is encountered
+                    if (instr.opcode.kind() == OpCode.Kind.JUMP ||
+                            instr.opcode.kind() == OpCode.Kind.BINARY_BRANCH ||
+                            instr.opcode.kind() == OpCode.Kind.JUMP_REGISTER) {
+                        i++;
+                        break;
+                    }
+                }
+                i++;
+            }
+            blocks.add(block);
         }
-        return false;
+
+        // map block labels to blocks for branch targets
+        Map<String, BasicBlock> labelToBlock = new HashMap<>();
+        for (BasicBlock block : blocks) {
+            if (block.label != null) {
+                labelToBlock.put(block.label, block);
+            }
+        }
+
+        // compute successors for each basic block
+        for (int j = 0; j < blocks.size(); j++) {
+            BasicBlock block = blocks.get(j);
+            if (block.instructions.isEmpty()) continue;
+            Instruction lastInstr = block.instructions.get(block.instructions.size() - 1);
+            switch (lastInstr.opcode.kind()) {
+                case JUMP -> {
+                    if (lastInstr instanceof Instruction.Jump jumpInstr) {
+                        BasicBlock target = labelToBlock.get(jumpInstr.label.name);
+                        if (target != null) {
+                            block.successors.add(target);
+                        }
+                    }
+                }
+                case BINARY_BRANCH -> {
+                    if (lastInstr instanceof Instruction.BinaryBranch bb) {
+                        BasicBlock target = labelToBlock.get(bb.label.name);
+                        if (target != null) {
+                            block.successors.add(target);
+                        }
+                    }
+                    if (j + 1 < blocks.size()) {
+                        block.successors.add(blocks.get(j + 1));
+                    }
+                }
+                case JUMP_REGISTER -> {
+                    // terminal block, no successors
+                }
+                default -> {
+                    if (j + 1 < blocks.size()) {
+                        block.successors.add(blocks.get(j + 1));
+                    }
+                }
+            }
+        }
+        // build predecessors
+        for (BasicBlock block : blocks) {
+            for (BasicBlock succ : block.successors) {
+                succ.predecessors.add(block);
+            }
+        }
+
+        // compute use and def sets for each block
+        for (BasicBlock block : blocks) {
+            for (Instruction instr : block.instructions) {
+                for (Register r : instr.uses()) {
+                    if (!block.def.contains(r) && r.isVirtual()) {
+                        block.use.add(r);
+                    }
+                }
+                Register d = instr.def();
+                if (d != null && d.isVirtual()) {
+                    block.def.add(d);
+                }
+            }
+        }
+
+        // worklist algorithm for block-level liveness analysis
+        Queue<BasicBlock> worklist = new LinkedList<>(blocks);
+        while (!worklist.isEmpty()) {
+            BasicBlock block = worklist.poll();
+            Set<Register> oldLiveIn = new HashSet<>(block.liveIn);
+            Set<Register> oldLiveOut = new HashSet<>(block.liveOut);
+
+            block.liveOut.clear();
+            for (BasicBlock succ : block.successors) {
+                block.liveOut.addAll(succ.liveIn);
+            }
+            Set<Register> newLiveIn = new HashSet<>(block.use);
+            Set<Register> diff = new HashSet<>(block.liveOut);
+            diff.removeAll(block.def);
+            newLiveIn.addAll(diff);
+            block.liveIn = newLiveIn;
+
+            if (!block.liveIn.equals(oldLiveIn) || !block.liveOut.equals(oldLiveOut)) {
+                worklist.addAll(block.predecessors);
+            }
+        }
+        // (local, per-instruction liveness is computed on demand via computeLocalLiveness)
     }
 
-    // output the CFG as a dot graph
+    public List<BasicBlock> getBlocks() {
+        return blocks;
+    }
+
+    // returns all instructions from all basic blocks
+    public List<Instruction> getInstructions() {
+        List<Instruction> instrs = new ArrayList<>();
+        for (BasicBlock block : blocks) {
+            instrs.addAll(block.instructions);
+        }
+        return instrs;
+    }
+
+    // compute local (per-instruction) liveness for a given basic block
+    // returns a list where index i corresponds to the live set immediately after instruction i
+    public List<Set<Register>> computeLocalLiveness(BasicBlock block) {
+        List<Set<Register>> liveAfter = new ArrayList<>();
+        int n = block.instructions.size();
+        for (int i = 0; i < n; i++) {
+            liveAfter.add(new HashSet<>());
+        }
+        Set<Register> live = new HashSet<>(block.liveOut);
+        for (int i = n - 1; i >= 0; i--) {
+            Instruction instr = block.instructions.get(i);
+            liveAfter.set(i, new HashSet<>(live));
+            // live = (live - def) ∪ uses
+            Register d = instr.def();
+            if (d != null && d.isVirtual()) {
+                live.remove(d);
+            }
+            for (Register r : instr.uses()) {
+                if (r.isVirtual()) {
+                    live.add(r);
+                }
+            }
+        }
+        return liveAfter;
+    }
+
+    // debugging: outputs the cfg as a dot graph (by basic block)
     public String toDot() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("digraph CFG {\n");
-        for (Instruction instr : nodes) {
-            String instrLabel = instr.toString().replace("\"", "\\\"");
-            sb.append("  \"").append(instrLabel).append("\";\n");
-            for (Instruction succ : successors.get(instr)) {
-                String succLabel = succ.toString().replace("\"", "\\\"");
-                sb.append("  \"").append(instrLabel).append("\" -> \"").append(succLabel).append("\";\n");
+        StringBuilder sb = new StringBuilder("digraph CFG {\n");
+        for (BasicBlock block : blocks) {
+            StringBuilder label = new StringBuilder();
+            if (block.label != null) {
+                label.append(block.label).append("\\l");
+            }
+            for (Instruction instr : block.instructions) {
+                label.append(instr.toString().replace("\"", "\\\"")).append("\\l");
+            }
+            sb.append("  \"").append(label.toString()).append("\";\n");
+            for (BasicBlock succ : block.successors) {
+                StringBuilder succLabel = new StringBuilder();
+                if (succ.label != null) {
+                    succLabel.append(succ.label).append("\\l");
+                }
+                for (Instruction instr : succ.instructions) {
+                    succLabel.append(instr.toString().replace("\"", "\\\"")).append("\\l");
+                }
+                sb.append("  \"").append(label.toString()).append("\" -> \"")
+                        .append(succLabel.toString()).append("\";\n");
             }
         }
         sb.append("}\n");
