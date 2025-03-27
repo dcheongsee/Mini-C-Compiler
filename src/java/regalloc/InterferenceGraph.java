@@ -12,6 +12,8 @@ public class InterferenceGraph {
     private final Map<Register, Register> coloring;
     private final int K;
     private final Map<Register, Integer> usageCount; // For improved spill heuristic
+    // mapping from virtual registers to their live range lengths
+    private final Map<Register, Integer> liveRangeLengths;
 
     private static final List<Register> PHYSICAL_REGS = Arrays.asList(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
@@ -85,6 +87,8 @@ public class InterferenceGraph {
         for (Register r : allNodes) {
             degrees.put(r, adjacency.get(r).size());
         }
+        // compute live range lengths
+        liveRangeLengths = cfg.computeLiveRangeLengths();
     }
 
     public InterferenceGraph(ControlFlowGraph cfg) {
@@ -111,7 +115,7 @@ public class InterferenceGraph {
                 }
                 currentDeg.remove(r);
             } else {
-                // pick a spill candidate using the usage/degree ratio
+                // pick a spill candidate using the composite cost heuristic
                 Register toSpill = pickSpill(currentDeg);
                 spilled.add(toSpill);
                 for (Register neigh : adjacency.get(toSpill)) {
@@ -147,17 +151,20 @@ public class InterferenceGraph {
         }
     }
 
+    // composite spill cost: lower cost means easier to spill
+    // cost is computed as (usageCount * liveRangeLength) / degree
     private Register pickSpill(Map<Register, Integer> degMap) {
-        double bestRatio = Double.MAX_VALUE;
+        double bestCost = Double.MAX_VALUE;
         Register best = null;
         for (Register r : degMap.keySet()) {
             int deg = degMap.get(r);
             int usage = usageCount.getOrDefault(r, 1);
-            double ratio = (double) usage / deg;
-            if (ratio < bestRatio) {
-                bestRatio = ratio;
+            int liveRange = liveRangeLengths.getOrDefault(r, 1);
+            double cost = ((double) usage * liveRange) / (deg);
+            if (cost < bestCost) {
+                bestCost = cost;
                 best = r;
-            } else if (ratio == bestRatio) {
+            } else if (cost == bestCost) {
                 if (r.toString().compareTo(best.toString()) < 0) {
                     best = r;
                 }
