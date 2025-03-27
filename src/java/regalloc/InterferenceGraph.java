@@ -12,8 +12,6 @@ public class InterferenceGraph {
     private final Map<Register, Register> coloring;
     private final int K;
     private final Map<Register, Integer> usageCount; // For improved spill heuristic
-    // mapping from virtual registers to their live range lengths
-    private final Map<Register, Integer> liveRangeLengths;
 
     private static final List<Register> PHYSICAL_REGS = Arrays.asList(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
@@ -87,8 +85,6 @@ public class InterferenceGraph {
         for (Register r : allNodes) {
             degrees.put(r, adjacency.get(r).size());
         }
-        // compute live range lengths
-        liveRangeLengths = cfg.computeLiveRangeLengths();
     }
 
     public InterferenceGraph(ControlFlowGraph cfg) {
@@ -110,17 +106,18 @@ public class InterferenceGraph {
                 stack.push(r);
                 for (Register neigh : adjacency.get(r)) {
                     if (currentDeg.containsKey(neigh)) {
-                        currentDeg.put(neigh, currentDeg.get(neigh) - 1);
+                        // prevent negative degrees by ensuring we don't subtract below 0
+                        currentDeg.put(neigh, Math.max(0, currentDeg.get(neigh) - 1));
                     }
                 }
                 currentDeg.remove(r);
             } else {
-                // pick a spill candidate using the composite cost heuristic
+                // pick a spill candidate using the usage/degree ratio
                 Register toSpill = pickSpill(currentDeg);
                 spilled.add(toSpill);
                 for (Register neigh : adjacency.get(toSpill)) {
                     if (currentDeg.containsKey(neigh)) {
-                        currentDeg.put(neigh, currentDeg.get(neigh) - 1);
+                        currentDeg.put(neigh, Math.max(0, currentDeg.get(neigh) - 1));
                     }
                 }
                 currentDeg.remove(toSpill);
@@ -151,20 +148,18 @@ public class InterferenceGraph {
         }
     }
 
-    // composite spill cost: lower cost means easier to spill
-    // cost is computed as (usageCount * liveRangeLength) / degree
     private Register pickSpill(Map<Register, Integer> degMap) {
-        double bestCost = Double.MAX_VALUE;
+        double bestRatio = Double.MAX_VALUE;
         Register best = null;
         for (Register r : degMap.keySet()) {
             int deg = degMap.get(r);
             int usage = usageCount.getOrDefault(r, 1);
-            int liveRange = liveRangeLengths.getOrDefault(r, 1);
-            double cost = ((double) usage * liveRange) / (deg);
-            if (cost < bestCost) {
-                bestCost = cost;
+            // protect against division by zero: if deg==0, set ratio to a very high value
+            double ratio = (deg == 0) ? Double.POSITIVE_INFINITY : ((double) usage / deg);
+            if (ratio < bestRatio) {
+                bestRatio = ratio;
                 best = r;
-            } else if (cost == bestCost) {
+            } else if (ratio == bestRatio) {
                 if (r.toString().compareTo(best.toString()) < 0) {
                     best = r;
                 }

@@ -178,6 +178,20 @@ public class ControlFlowGraph {
                 worklist.addAll(block.predecessors);
             }
         }
+
+        // handle dead definitions
+        // if last instruction in a block defines a virtual register that is never used,
+        // add that register to the block's liveOut set (once per block)
+        for (BasicBlock block : blocks) {
+            if (!block.instructions.isEmpty()) {
+                Instruction lastInstr = block.instructions.get(block.instructions.size() - 1);
+                Register d = lastInstr.def();
+                if (d != null && d.isVirtual() && !block.liveOut.contains(d)) {
+                    block.liveOut.add(d);
+                }
+            }
+        }
+
         // (local, per-instruction liveness is computed on demand via computeLocalLiveness)
     }
 
@@ -192,33 +206,6 @@ public class ControlFlowGraph {
             instrs.addAll(block.instructions);
         }
         return instrs;
-    }
-
-    // compute live range lengths for virtual registers across the function
-    // returns a mapping from a virtual register to its live range length (in instruction count)
-    public Map<Register, Integer> computeLiveRangeLengths() {
-        Map<Register, Integer> liveRanges = new HashMap<>();
-        Map<Register, Integer> firstOccurrence = new HashMap<>();
-        Map<Register, Integer> lastOccurrence = new HashMap<>();
-        int index = 0;
-        for (BasicBlock block : blocks) {
-            for (Instruction instr : block.instructions) {
-                for (Register r : instr.registers()) {
-                    if (r.isVirtual()) {
-                        if (!firstOccurrence.containsKey(r)) {
-                            firstOccurrence.put(r, index);
-                        }
-                        lastOccurrence.put(r, index);
-                    }
-                }
-                index++;
-            }
-        }
-        for (Register r : firstOccurrence.keySet()) {
-            int length = lastOccurrence.get(r) - firstOccurrence.get(r) + 1;
-            liveRanges.put(r, length);
-        }
-        return liveRanges;
     }
 
     // compute local (per-instruction) liveness for a given basic block
