@@ -7,7 +7,7 @@ public class GraphColouringRegAlloc implements AssemblyPass {
 
     public static final GraphColouringRegAlloc INSTANCE = new GraphColouringRegAlloc();
 
-
+    // track labels used for spilled VRs
     private final Map<Register.Virtual, Label> spillLabels = new HashMap<>();
 
     @Override
@@ -54,10 +54,8 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             }
 
             // if we STILL get spills, pick one VR to rewrite
-            // from the second attempt's spilled set
             var s = attempt2.spilled.iterator().next();
-            work = rewriteOneVR(work, s);
-            // then loop again from step (1)
+            work = rewriteOneVRWithCaching(work, s);
         }
     }
 
@@ -95,52 +93,139 @@ public class GraphColouringRegAlloc implements AssemblyPass {
     }
 
 
-    private List<AssemblyItem> rewriteOneVR(List<AssemblyItem> items, Register.Virtual s) {
+    private List<AssemblyItem> rewriteOneVRWithCaching(List<AssemblyItem> items, Register.Virtual s) {
+        // we need liveness info for each instruction node so we know if 's' is liveOut
+        // build a CFG from 'items', run Liveness, then iterate nodes in order to see out sets
+        var tempSection = new AssemblyProgram.TextSection();
+        for (var it : items) {
+            if (it instanceof Instruction ins) {
+                tempSection.emit(ins);
+            } else if (it instanceof AssemblyTextItem ati) {
+                tempSection.emit(ati);
+            }
+        }
+        var cfg = CFGBuilder.build(tempSection);
+        LivenessAnalysis.run(cfg);
+
+        // map "index -> liveOut set" so we know if s is alive after each instruction
+        Map<Integer, Set<Register.Virtual>> liveOutMap = new HashMap<>();
+        for (var node : cfg.nodes) {
+            liveOutMap.put(node.index, node.out);
+        }
+
+
+        List<Instruction> instrList = new ArrayList<>();
+        for (var node : cfg.nodes) {
+            instrList.add(node.index, node.instr);
+        }
+
+        // do the actual rewriting with local caching
+        List<AssemblyItem> out = new ArrayList<>();
         Label spillLbl = spillLabels.computeIfAbsent(s, v -> Label.create("spill_" + v));
 
-        List<AssemblyItem> out = new ArrayList<>();
-        for (var it : items) {
-            if (it instanceof Label || it instanceof Directive || it instanceof Comment) {
-                out.add(it);
-            } else if (it instanceof Instruction ins) {
-                // skip push/pop expansions
-                if (ins == Instruction.Nullary.pushRegisters || ins == Instruction.Nullary.popRegisters) {
-                    out.add(ins);
-                    continue;
-                }
-                boolean usesS = ins.uses().contains(s);
-                boolean defsS = (ins.def() != null && ins.def().equals(s));
-                if (!usesS && !defsS) {
-                    out.add(ins);
-                } else {
-                    // insert load if used
-                    List<Instruction> pre = new ArrayList<>();
-                    List<Instruction> post = new ArrayList<>();
-                    Map<Register,Register> vrMap = new HashMap<>();
-                    if (usesS) {
-                        Register.Virtual tmp = Register.Virtual.create();
-                        pre.add(new Instruction.LoadAddress(tmp, spillLbl));
-                        pre.add(new Instruction.Load(OpCode.LW, tmp, tmp, 0));
-                        vrMap.put(s, tmp);
-                    }
-                    Instruction newI = ins.rebuild(vrMap);
-                    // insert store if defined
-                    if (defsS) {
-                        Register.Virtual dv = (Register.Virtual) vrMap.get(s);
-                        if (dv == null) {
-                            dv = Register.Virtual.create();
-                            newI = newI.rebuild(Collections.singletonMap(s, dv));
-                        }
-                        Register.Virtual laReg = Register.Virtual.create();
-                        post.add(new Instruction.LoadAddress(laReg, spillLbl));
-                        post.add(new Instruction.Store(OpCode.SW, dv, laReg, 0));
-                    }
-                    out.addAll(pre);
-                    out.add(newI);
-                    out.addAll(post);
+        // ephemeral register used to hold 's', or null if not currently loaded
+        Register.Virtual tempReg = null;
+        // true if the ephemeral register has a dirty copy of 's' that needs storing
+        boolean dirty = false;
+
+
+        Map<Integer, List<AssemblyItem>> nonInstrBeforeIndex = new HashMap<>();
+        {
+            int instrCounter = 0;
+            for (var it : items) {
+                if (it instanceof Label || it instanceof Directive || it instanceof Comment) {
+                    // attach this item to the current instrCounter in a list
+                    nonInstrBeforeIndex.computeIfAbsent(instrCounter, k -> new ArrayList<>()).add(it);
+                } else if (it instanceof Instruction) {
+                    instrCounter++;
                 }
             }
         }
+
+        // iterate from i=0 to i= (cfg.nodes.size()) => each node is one instruction
+        for (int i = 0; i < cfg.nodes.size(); i++) {
+            // insert any non-instruction items preceding this instruction
+            if (nonInstrBeforeIndex.containsKey(i)) {
+                out.addAll(nonInstrBeforeIndex.get(i));
+            }
+
+            Instruction ins = instrList.get(i);
+            if (ins == Instruction.Nullary.pushRegisters || ins == Instruction.Nullary.popRegisters) {
+                out.add(ins);
+                continue;
+            }
+
+            // check if 's' is used or defined by 'ins'
+            boolean usesS = ins.uses().contains(s);
+            boolean defsS = (ins.def() != null && ins.def().equals(s));
+
+            // build pre, post expansions
+            List<Instruction> pre = new ArrayList<>();
+            List<Instruction> post = new ArrayList<>();
+
+            // if 'ins' uses 's'
+            if (usesS) {
+                // if not currently loaded, do a load
+                if (tempReg == null) {
+                    tempReg = Register.Virtual.create();
+                    // load from memory
+                    pre.add(new Instruction.LoadAddress(tempReg, spillLbl));
+                    pre.add(new Instruction.Load(OpCode.LW, tempReg, tempReg, 0));
+                    dirty = false; // we've just loaded a clean copy
+                }
+            }
+
+            // now rebuild the instruction to reference tempReg if we have it
+            Map<Register, Register> vrMap = new HashMap<>();
+            if (usesS && tempReg != null) {
+                vrMap.put(s, tempReg);
+            }
+
+            // if we define 's'
+            if (defsS) {
+                // if we don't have tempReg yet, create it so we can hold the new value
+                if (tempReg == null) {
+                    tempReg = Register.Virtual.create();
+                }
+                // rewrite the definition to go into tempReg
+                vrMap.put(s, tempReg);
+            }
+
+            // rebuild the instruction with the map
+            Instruction newI = ins.rebuild(vrMap);
+            out.addAll(pre);
+            out.add(newI);
+
+            // if we defined 's', mark it dirty
+            if (defsS) {
+                dirty = true;
+            }
+
+            // check if 's' is live after this instruction
+            // if s is NOT in liveOut => we can store it if dirty & discard
+            Set<Register.Virtual> outSet = liveOutMap.get(i);
+            boolean isLiveOut = outSet != null && outSet.contains(s);
+            if (!isLiveOut) {
+                // if we had a dirty copy, store it
+                if (tempReg != null && dirty) {
+                    Register.Virtual laReg = Register.Virtual.create();
+                    post.add(new Instruction.LoadAddress(laReg, spillLbl));
+                    post.add(new Instruction.Store(OpCode.SW, tempReg, laReg, 0));
+                }
+                // reset ephemeral
+                tempReg = null;
+                dirty = false;
+            }
+
+            out.addAll(post);
+        }
+
+        // after the loop, any non-instruction items that come after the last instruction
+        // will appear in nonInstrBeforeIndex at key=cfg.nodes.size()
+        if (nonInstrBeforeIndex.containsKey(cfg.nodes.size())) {
+            out.addAll(nonInstrBeforeIndex.get(cfg.nodes.size()));
+        }
+
         return out;
     }
 
@@ -177,7 +262,6 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                 case Instruction ins -> {
                     if (ins == Instruction.Nullary.pushRegisters) {
                         ns.emit("orig pushRegisters");
-                        // (Same push logic as before)
                         rewritePush(ns, map, localSpills);
                     }
                     else if (ins == Instruction.Nullary.popRegisters) {
