@@ -1,199 +1,87 @@
 package regalloc;
 
-import gen.asm.Instruction;
 import gen.asm.Register;
 import java.util.*;
 
-public class InterferenceGraph {
-    private final Map<Register, Set<Register>> adjacency;
-    private final Map<Register, Integer> degrees;
-    private final List<Register> allNodes;
-    private final Set<Register> spilled;
-    private final Map<Register, Register> coloring;
-    private final int K;
-    private final Map<Register, Integer> usageCount; // For improved spill heuristic
+public final class InterferenceGraph {
 
-    private static final List<Register> PHYSICAL_REGS = Arrays.asList(
-            Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
-            Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
-            Register.Arch.s0, Register.Arch.s1, Register.Arch.s2, Register.Arch.s3,
-            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
-    );
+    private final Map<Register.Virtual, Set<Register.Virtual>> adj = new HashMap<>();
+    private final Set<Register.Virtual> all = new HashSet<>();
 
-    public InterferenceGraph(ControlFlowGraph cfg, int K) {
-        this.K = K;
-        adjacency = new HashMap<>();
-        degrees = new HashMap<>();
-        spilled = new HashSet<>();
-        coloring = new HashMap<>();
-        usageCount = new HashMap<>();
+    // track usage for each VR
+    private final Map<Register.Virtual, Integer> usage = new HashMap<>();
 
-        // collect all virtual registers and count usage
-        Set<Register> vregs = new HashSet<>();
-        for (Instruction instr : cfg.getInstructions()) {
-            for (Register r : instr.uses()) {
-                if (r.isVirtual()) {
-                    vregs.add(r);
-                    usageCount.put(r, usageCount.getOrDefault(r, 0) + 1);
-                }
+
+    public void build(CFGBuilder.CFG cfg) {
+        // gather all vrs, also build usage counts
+        for (var n : cfg.nodes) {
+            // for each VR used by this node, increment usage
+            for (var u : n.uses) {
+                usage.put(u, usage.getOrDefault(u, 0) + 1);
             }
-            Register d = instr.def();
-            if (d != null && d.isVirtual()) {
-                vregs.add(d);
-                usageCount.put(d, usageCount.getOrDefault(d, 0) + 1);
+            // also add 'def' to the set of all VRs
+            if (n.def != null) {
+
             }
-        }
-        for (Register r : vregs) {
-            adjacency.put(r, new HashSet<>());
+
+            // add them to the global set
+            all.addAll(n.in);
+            all.addAll(n.out);
+            if (n.def != null) {
+                all.add(n.def);
+            }
+            all.addAll(n.uses);
         }
 
-        // use local liveness from each basic block to add interference edges
-        for (ControlFlowGraph.BasicBlock block : cfg.getBlocks()) {
-            List<Set<Register>> localLiveness = cfg.computeLocalLiveness(block);
-            // for each instruction, add interference among registers in the live set
-            for (Set<Register> liveSet : localLiveness) {
-                List<Register> liveList = new ArrayList<>(liveSet);
-                for (int i = 0; i < liveList.size(); i++) {
-                    Register r1 = liveList.get(i);
-                    for (int j = i + 1; j < liveList.size(); j++) {
-                        Register r2 = liveList.get(j);
-                        if (!r1.equals(r2)) {
-                            adjacency.get(r1).add(r2);
-                            adjacency.get(r2).add(r1);
-                        }
+        // prepare adjacency sets for each VR
+        for (var v : all) {
+            adj.putIfAbsent(v, new HashSet<>());
+            usage.putIfAbsent(v, 0); // ensure every VR has an entry in usage, even if 0
+        }
+
+        // add edges for live sets
+        for (var n : cfg.nodes) {
+            var live = new HashSet<>(n.in);
+            live.addAll(n.out);
+            if (n.def != null) live.add(n.def);
+            live.addAll(n.uses);
+
+            // every pair in 'live' interferes
+            var list = new ArrayList<>(live);
+            for (int i = 0; i < list.size(); i++) {
+                for (int j = i + 1; j < list.size(); j++) {
+                    var a = list.get(i);
+                    var b = list.get(j);
+                    if (!a.equals(b)) {
+                        adj.get(a).add(b);
+                        adj.get(b).add(a);
                     }
                 }
             }
-            // also, for each instruction defining a register, add interference with its live-out set
-            int idx = 0;
-            for (Instruction instr : block.instructions) {
-                Register d = instr.def();
-                if (d != null && d.isVirtual()) {
-                    Set<Register> liveAfter = localLiveness.get(idx);
-                    for (Register r : liveAfter) {
-                        if (!r.equals(d)) {
-                            adjacency.get(d).add(r);
-                            adjacency.get(r).add(d);
-                        }
-                    }
-                }
-                idx++;
-            }
-        }
-
-        allNodes = new ArrayList<>(adjacency.keySet());
-        for (Register r : allNodes) {
-            degrees.put(r, adjacency.get(r).size());
         }
     }
 
-    public InterferenceGraph(ControlFlowGraph cfg) {
-        this(cfg, 16);
+
+    public int degree(Register.Virtual v, Set<Register.Virtual> removed) {
+        int d = 0;
+        for (var x : adj.getOrDefault(v, Set.of())) {
+            if (!removed.contains(x)) d++;
+        }
+        return d;
     }
 
-    public void color() {
-        Stack<Register> stack = new Stack<>();
-        Map<Register, Integer> currentDeg = new HashMap<>(degrees);
 
-        // Chaitin simplification using improved spill heuristic
-        while (!currentDeg.isEmpty()) {
-            Optional<Register> candidate = currentDeg.keySet().stream()
-                    .filter(r -> currentDeg.get(r) < K)
-                    .findFirst();
-
-            if (candidate.isPresent()) {
-                Register r = candidate.get();
-                stack.push(r);
-                for (Register neigh : adjacency.get(r)) {
-                    if (currentDeg.containsKey(neigh)) {
-                        // prevent negative degrees by ensuring we don't subtract below 0
-                        currentDeg.put(neigh, Math.max(0, currentDeg.get(neigh) - 1));
-                    }
-                }
-                currentDeg.remove(r);
-            } else {
-                // pick a spill candidate using the usage/degree ratio
-                Register toSpill = pickSpill(currentDeg);
-                spilled.add(toSpill);
-                for (Register neigh : adjacency.get(toSpill)) {
-                    if (currentDeg.containsKey(neigh)) {
-                        currentDeg.put(neigh, Math.max(0, currentDeg.get(neigh) - 1));
-                    }
-                }
-                currentDeg.remove(toSpill);
-            }
-        }
-
-        // assign colors
-        while (!stack.isEmpty()) {
-            Register r = stack.pop();
-            Set<Register> usedColors = new HashSet<>();
-            for (Register neighbor : adjacency.get(r)) {
-                if (coloring.containsKey(neighbor)) {
-                    usedColors.add(coloring.get(neighbor));
-                }
-            }
-            Register chosen = null;
-            for (Register pr : PHYSICAL_REGS) {
-                if (!usedColors.contains(pr)) {
-                    chosen = pr;
-                    break;
-                }
-            }
-            if (chosen == null) {
-                spilled.add(r);
-            } else {
-                coloring.put(r, chosen);
-            }
-        }
+    public Set<Register.Virtual> neighbors(Register.Virtual v) {
+        return adj.getOrDefault(v, Set.of());
     }
 
-    private Register pickSpill(Map<Register, Integer> degMap) {
-        double bestRatio = Double.MAX_VALUE;
-        Register best = null;
-        for (Register r : degMap.keySet()) {
-            int deg = degMap.get(r);
-            int usage = usageCount.getOrDefault(r, 1);
-            // protect against division by zero: if deg==0, set ratio to a very high value
-            double ratio = (deg == 0) ? Double.POSITIVE_INFINITY : ((double) usage / deg);
-            if (ratio < bestRatio) {
-                bestRatio = ratio;
-                best = r;
-            } else if (ratio == bestRatio) {
-                if (r.toString().compareTo(best.toString()) < 0) {
-                    best = r;
-                }
-            }
-        }
-        return best;
+
+    public Set<Register.Virtual> vertices() {
+        return all;
     }
 
-    public Map<Register, Register> getColoring() {
-        return coloring;
-    }
 
-    public Set<Register> getSpilled() {
-        return spilled;
-    }
-
-    // debugging: outputs the interference graph as a dot graph
-    public String toDot() {
-        StringBuilder sb = new StringBuilder("graph InterferenceGraph {\n");
-        Set<String> visited = new HashSet<>();
-        for (Register r : adjacency.keySet()) {
-            sb.append("  \"").append(r).append("\";\n");
-        }
-        for (Register r : adjacency.keySet()) {
-            for (Register n : adjacency.get(r)) {
-                String edge = r + "--" + n;
-                String reverseEdge = n + "--" + r;
-                if (!visited.contains(edge) && !visited.contains(reverseEdge)) {
-                    sb.append("  \"").append(r).append("\" -- \"").append(n).append("\";\n");
-                    visited.add(edge);
-                }
-            }
-        }
-        sb.append("}\n");
-        return sb.toString();
+    public int usage(Register.Virtual v) {
+        return usage.getOrDefault(v, 0);
     }
 }

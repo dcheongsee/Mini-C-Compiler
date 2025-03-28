@@ -103,7 +103,7 @@ public class Main4 {
                 mode = Mode.SEMANTICANALYSIS;
                 curArgCnt++;
                 break;
-             case "-gen":
+            case "-gen":
                 mode = Mode.GEN;
                 curArgCnt++;
                 ensureArgExists(args, curArgCnt);
@@ -241,7 +241,7 @@ public class Main4 {
             System.exit(PASS);
         }
 
-         else if (mode == Mode.REGALLOC) {
+        else if (mode == Mode.REGALLOC) {
             ensureArgExists(args, curArgCnt);
             File outputFile = new File(args[curArgCnt]);
             curArgCnt++;
