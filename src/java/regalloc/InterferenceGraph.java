@@ -13,49 +13,30 @@ public final class InterferenceGraph {
 
 
     public void build(CFGBuilder.CFG cfg) {
-        // gather all vrs, also build usage counts
+        // gather all virtual registers and usage counts
         for (var n : cfg.nodes) {
-            // for each VR used by this node, increment usage
             for (var u : n.uses) {
                 usage.put(u, usage.getOrDefault(u, 0) + 1);
             }
-            // also add 'def' to the set of all VRs
-            if (n.def != null) {
-
-            }
-
-            // add them to the global set
+            if (n.def != null) all.add(n.def);
             all.addAll(n.in);
             all.addAll(n.out);
-            if (n.def != null) {
-                all.add(n.def);
-            }
             all.addAll(n.uses);
         }
-
-        // prepare adjacency sets for each VR
         for (var v : all) {
             adj.putIfAbsent(v, new HashSet<>());
-            usage.putIfAbsent(v, 0); // ensure every VR has an entry in usage, even if 0
+            usage.putIfAbsent(v, 0);
         }
-
-        // add edges for live sets
+        // add interference edges based on out sets
         for (var n : cfg.nodes) {
-            var live = new HashSet<>(n.in);
-            live.addAll(n.out);
-            if (n.def != null) live.add(n.def);
-            live.addAll(n.uses);
-
-            // every pair in 'live' interferes
-            var list = new ArrayList<>(live);
+            var list = new ArrayList<>(n.out);
             for (int i = 0; i < list.size(); i++) {
                 for (int j = i + 1; j < list.size(); j++) {
                     var a = list.get(i);
                     var b = list.get(j);
-                    if (!a.equals(b)) {
-                        adj.get(a).add(b);
-                        adj.get(b).add(a);
-                    }
+                    // no need for !a.equals(b) since list is from a Set
+                    adj.get(a).add(b);
+                    adj.get(b).add(a);
                 }
             }
         }
