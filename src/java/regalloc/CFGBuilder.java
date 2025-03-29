@@ -6,101 +6,151 @@ import java.util.*;
 
 public final class CFGBuilder {
 
-    // node stores one instruction
-    public static final class CFGNode {
+    public static final class BasicBlock {
         public final int index;
-        public final Instruction instr;
-        public final List<CFGNode> succ = new ArrayList<>();
-        public final List<CFGNode> pred = new ArrayList<>();
-        public final Set<Register.Virtual> uses = new HashSet<>();
-        public Register.Virtual def;
+        public final List<Instruction> instrs = new ArrayList<>();
+        public final Set<Register.Virtual> use = new HashSet<>();
+        public final Set<Register.Virtual> def = new HashSet<>();
         public Set<Register.Virtual> in = new HashSet<>();
         public Set<Register.Virtual> out = new HashSet<>();
+        public final List<BasicBlock> succ = new ArrayList<>();
+        public final List<BasicBlock> pred = new ArrayList<>();
 
-        public CFGNode(int i, Instruction ins) {
-            index = i;
-            instr = ins;
+        public BasicBlock(int index) {
+            this.index = index;
         }
     }
 
-    // cfg has nodes and label map
     public static final class CFG {
-        public final List<CFGNode> nodes;
-        public final Map<Label,Integer> lblMap;
-        public CFG(List<CFGNode> nds, Map<Label,Integer> map) {
-            nodes = nds;
-            lblMap = map;
+        public final List<BasicBlock> blocks;
+        public final Map<Label,Integer> lblMap; // maps a label to the block index that begins at that label
+        public CFG(List<BasicBlock> blocks, Map<Label,Integer> lblMap) {
+            this.blocks = blocks;
+            this.lblMap = lblMap;
         }
     }
 
     public static CFG build(AssemblyProgram.TextSection sec) {
-        // collects instructions and labels
-        List<CFGNode> nodes = new ArrayList<>();
-        Map<Label,Integer> lblMap = new HashMap<>();
-        int idx = 0;
-        // scans items in text section
+        // Collect instructions and associate labels with instruction indices.
+        List<Instruction> instructions = new ArrayList<>();
+        Map<Integer, List<Label>> instrLabels = new HashMap<>();
+        Map<Label, Integer> labelToInstr = new HashMap<>();
+        int instrIndex = 0;
         for (var item : sec.items) {
-            // label marks next node index
             if (item instanceof Label l) {
-                lblMap.put(l, idx);
+                instrLabels.computeIfAbsent(instrIndex, k -> new ArrayList<>()).add(l);
+                labelToInstr.put(l, instrIndex);
             } else if (item instanceof Instruction ins) {
-                // create a node for each instruction
-                CFGNode node = new CFGNode(idx, ins);
-                nodes.add(node);
-                idx++;
+                instructions.add(ins);
+                instrIndex++;
             }
         }
-        // link each node to successors
-        for (int i = 0; i < nodes.size(); i++) {
-            CFGNode n = nodes.get(i);
-            if (i < nodes.size() - 1) {
-                // fallthrough to next node
-                n.succ.add(nodes.get(i+1));
-                nodes.get(i+1).pred.add(n);
+        // Identify leaders.
+        Set<Integer> leaders = new HashSet<>();
+        if (!instructions.isEmpty()) {
+            leaders.add(0);
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            // If an instruction has a label, mark it as a leader.
+            if (instrLabels.containsKey(i)) {
+                leaders.add(i);
             }
-            // handle unconditional jumps
-            if (n.instr instanceof Instruction.Jump j) {
-                n.succ.clear();
-                var t = lblMap.get(j.label);
-                if (t != null) {
-                    n.succ.add(nodes.get(t));
-                    nodes.get(t).pred.add(n);
-                }
-            }
-            // jump register ends control flow
-            else if (n.instr instanceof Instruction.JumpRegister) {
-                n.succ.clear();
-            }
-            // handle binary branch
-            else if (n.instr instanceof Instruction.BinaryBranch bb) {
-                var t = lblMap.get(bb.label);
-                if (t != null) {
-                    n.succ.add(nodes.get(t));
-                    nodes.get(t).pred.add(n);
-                }
-            }
-            // handle unary branch
-            else if (n.instr instanceof Instruction.UnaryBranch ub) {
-                var t = lblMap.get(ub.label);
-                if (t != null) {
-                    n.succ.add(nodes.get(t));
-                    nodes.get(t).pred.add(n);
+            // If the previous instruction is a jump or branch, mark this as a leader.
+            if (i > 0) {
+                Instruction prev = instructions.get(i - 1);
+                if (prev instanceof Instruction.Jump || prev instanceof Instruction.BinaryBranch || prev instanceof Instruction.UnaryBranch) {
+                    leaders.add(i);
                 }
             }
         }
-        // record uses and def
-        for (var n : nodes) {
-            var d = n.instr.def();
-            if (d instanceof Register.Virtual dv) {
-                n.def = dv;
+        List<Integer> leaderList = new ArrayList<>(leaders);
+        Collections.sort(leaderList);
+        // Partition instructions into basic blocks.
+        List<BasicBlock> blocks = new ArrayList<>();
+        // Map each instruction index to its block index.
+        int[] blockForInstruction = new int[instructions.size()];
+        for (int i = 0; i < leaderList.size(); i++) {
+            int start = leaderList.get(i);
+            int end = (i + 1 < leaderList.size()) ? leaderList.get(i + 1) : instructions.size();
+            BasicBlock block = new BasicBlock(blocks.size());
+            for (int j = start; j < end; j++) {
+                block.instrs.add(instructions.get(j));
+                blockForInstruction[j] = block.index;
             }
-            for (var u : n.instr.uses()) {
-                if (u instanceof Register.Virtual uv) {
-                    n.uses.add(uv);
+            blocks.add(block);
+        }
+        // Compute use and def for each basic block.
+        for (BasicBlock block : blocks) {
+            for (Instruction ins : block.instrs) {
+                // For each use: if not already defined in the block, add to use.
+                for (var u : ins.uses()) {
+                    if (u instanceof Register.Virtual vr) {
+                        if (!block.def.contains(vr)) {
+                            block.use.add(vr);
+                        }
+                    }
+                }
+                // For each def: add to def.
+                if (ins.def() instanceof Register.Virtual vr) {
+                    block.def.add(vr);
                 }
             }
         }
-        // returns built cfg
-        return new CFG(nodes, lblMap);
+        // Build control flow: determine successors for each block.
+        Map<Label, Integer> lblMap = new HashMap<>(); // maps label to block index
+        // Populate lblMap using labelToInstr and blockForInstruction.
+        for (var entry : labelToInstr.entrySet()) {
+            Label l = entry.getKey();
+            int instrIdx = entry.getValue();
+            int blockIdx = blockForInstruction[instrIdx];
+            lblMap.put(l, blockIdx);
+        }
+        for (int i = 0; i < blocks.size(); i++) {
+            BasicBlock block = blocks.get(i);
+            if (block.instrs.isEmpty()) continue;
+            Instruction last = block.instrs.get(block.instrs.size() - 1);
+            if (last instanceof Instruction.Jump j) {
+                Integer targetBlock = lblMap.get(j.label);
+                if (targetBlock != null) {
+                    BasicBlock target = blocks.get(targetBlock);
+                    block.succ.add(target);
+                    target.pred.add(block);
+                }
+            } else if (last instanceof Instruction.BinaryBranch bb) {
+                Integer targetBlock = lblMap.get(bb.label);
+                if (targetBlock != null) {
+                    BasicBlock target = blocks.get(targetBlock);
+                    block.succ.add(target);
+                    target.pred.add(block);
+                }
+                // Fall-through successor.
+                if (i + 1 < blocks.size()) {
+                    BasicBlock fallthrough = blocks.get(i + 1);
+                    block.succ.add(fallthrough);
+                    fallthrough.pred.add(block);
+                }
+            } else if (last instanceof Instruction.UnaryBranch ub) {
+                Integer targetBlock = lblMap.get(ub.label);
+                if (targetBlock != null) {
+                    BasicBlock target = blocks.get(targetBlock);
+                    block.succ.add(target);
+                    target.pred.add(block);
+                }
+                // Fall-through successor.
+                if (i + 1 < blocks.size()) {
+                    BasicBlock fallthrough = blocks.get(i + 1);
+                    block.succ.add(fallthrough);
+                    fallthrough.pred.add(block);
+                }
+            } else {
+                // Default fall-through.
+                if (i + 1 < blocks.size()) {
+                    BasicBlock fallthrough = blocks.get(i + 1);
+                    block.succ.add(fallthrough);
+                    fallthrough.pred.add(block);
+                }
+            }
+        }
+        return new CFG(blocks, lblMap);
     }
 }
