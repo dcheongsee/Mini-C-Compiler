@@ -3,101 +3,75 @@ package regalloc;
 import gen.asm.Register;
 import java.util.*;
 
-public final class ChaitinAllocator {
+public class ChaitinAllocator {
 
-    // full set of allowed physical registers ($t0-$t9 and $s0-$s7)
-    private static final List<Register> ALL_MIPS_REGS = Arrays.asList(
+    private static final List<Register> PHYSICAL_REGS = Arrays.asList(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
             Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
-            Register.Arch.t8, Register.Arch.t9, Register.Arch.s0, Register.Arch.s1,
-            Register.Arch.s2, Register.Arch.s3, Register.Arch.s4, Register.Arch.s5,
-            Register.Arch.s6, Register.Arch.s7
+            Register.Arch.s0, Register.Arch.s1, Register.Arch.s2, Register.Arch.s3,
+            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
     );
 
-    public record Result(Map<Register.Virtual, Register> map, Set<Register.Virtual> spilled) {}
-
-    private final boolean reserveTwo;
-
-    public ChaitinAllocator(boolean reserveTwo) {
-        this.reserveTwo = reserveTwo;
-    }
+    public record Result(Map<Register, Register> map, Set<Register> spilled) {}
 
     public Result color(InterferenceGraph ig) {
-        // k is the number of available colors
-        int k = ALL_MIPS_REGS.size();
-        if (reserveTwo && k > 2) {
-            k -= 2;
-        }
-
-        Deque<Register.Virtual> stack = new ArrayDeque<>();
-        Set<Register.Virtual> removed = new HashSet<>();
-        Set<Register.Virtual> spill = new HashSet<>();
+        int K = PHYSICAL_REGS.size();
+        Deque<Register> stack = new ArrayDeque<>();
+        Set<Register> removed = new HashSet<>();
+        Set<Register> spill = new HashSet<>();
 
         while (true) {
-            boolean foundAny = true;
-            while (foundAny) {
-                foundAny = false;
-                for (var v : ig.vertices()) {
-                    if (removed.contains(v)) continue;
-                    int deg = ig.degree(v, removed);
-                    if (deg < k) {
+            boolean found = true;
+            while (found) {
+                found = false;
+                for (Register v : ig.getAllRegisters()) {
+                    long effectiveDegree = ig.getDegree(v) - removed.stream().filter(ig.getNeighbors(v)::contains).count();
+                    if (!removed.contains(v) && effectiveDegree < K) {
                         stack.push(v);
                         removed.add(v);
-                        foundAny = true;
+                        found = true;
                         break;
                     }
                 }
             }
-
-            List<Register.Virtual> remain = new ArrayList<>();
-            for (var v : ig.vertices()) {
+            List<Register> remaining = new ArrayList<>();
+            for (Register v : ig.getAllRegisters()) {
                 if (!removed.contains(v)) {
-                    remain.add(v);
+                    remaining.add(v);
                 }
             }
-            if (remain.isEmpty()) {
+            if (remaining.isEmpty()) {
                 break;
             }
-            // select a victim to spill
-            remain.sort((a, b) -> {
-                int degA = ig.degree(a, removed);
-                int degB = ig.degree(b, removed);
-                if (degA != degB) {
-                    return Integer.compare(degB, degA);
-                }
-                int useA = ig.usage(a);
-                int useB = ig.usage(b);
-                if (useA != useB) {
-                    return Integer.compare(useB, useA);
-                }
-                return a.toString().compareTo(b.toString());
-            });
-            Register.Virtual victim = remain.get(0);
-            stack.push(victim);
-            removed.add(victim);
-            spill.add(victim);
+            // select a register to spill using usage/degree heuristic
+            Register toSpill = remaining.stream()
+                    .min((a, b) -> {
+                        double ratioA = (double) ig.getUsage(a) / ig.getDegree(a);
+                        double ratioB = (double) ig.getUsage(b) / ig.getDegree(b);
+                        return Double.compare(ratioA, ratioB);
+                    })
+                    .orElse(remaining.get(0));
+            stack.push(toSpill);
+            removed.add(toSpill);
+            spill.add(toSpill);
         }
 
-        Map<Register.Virtual, Register> assign = new HashMap<>();
+        Map<Register, Register> assign = new HashMap<>();
         while (!stack.isEmpty()) {
-            Register.Virtual v = stack.pop();
+            Register v = stack.pop();
             if (spill.contains(v)) {
-                assign.put(v, null);
+                assign.put(v, null); // Spilled
             } else {
                 Set<Register> used = new HashSet<>();
-                for (var w : ig.neighbors(v)) {
+                for (Register w : ig.getNeighbors(v)) {
                     if (assign.containsKey(w) && assign.get(w) != null) {
                         used.add(assign.get(w));
                     }
                 }
-                List<Register> colorSet = reserveTwo ? ALL_MIPS_REGS.subList(0, k) : ALL_MIPS_REGS;
-                Register choice = null;
-                for (Register r : colorSet) {
-                    if (!used.contains(r)) {
-                        choice = r;
-                        break;
-                    }
-                }
+                Register choice = PHYSICAL_REGS.stream()
+                        .filter(r -> !used.contains(r))
+                        .findFirst()
+                        .orElse(null);
                 if (choice == null) {
                     assign.put(v, null);
                     spill.add(v);
