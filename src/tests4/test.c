@@ -1,61 +1,51 @@
-/*
-expected output:
-4100003
-Tricky edge jumps test passed
-*/
-int empty_func();
-int tricky_func(int a, int b);
-
-int x;
-int y;
-int z;
-int temp;
-int final_result;
+int arr[12];
 int i;
-int j;
-int sum;
-int arr[200];
+int result;
+int weight;
+int adjust;
 
-int empty_func() {
-  return 0;
-}
-
-int tricky_func(int a, int b) {
-  int result;
-  int dead;  /* dead computation */
-  if ((a - b) > 0) {
-    result = a - b + 7;
-    dead = result * 123;  /* dead code */
-  } else {
-    result = b - a + 3;
-  }
-  return result;
-}
+int weightedReduce(int n);
+int adjustResult(int val);
 
 int main() {
-  x = 100;
-  y = 150;
-  z = 200;
-  temp = empty_func();
-  temp = tricky_func(x, y);
-  sum = 0;
-  i = 0;
-  while(i < 200) {
-    arr[i] = i + 1;
-    i = i + 1;
-  }
-  i = 0;
-  while(i < 200) {
-    j = 0;
-    while(j < 200) {
-      temp = tricky_func(arr[i], z);
-      sum = sum + temp;
-      j = j + 1;
+    i = 0;
+    result = 0;
+    weight = 2;
+    adjust = 3;
+    arr[0] = 5;
+    arr[1] = 7;
+    arr[2] = 9;
+    arr[3] = 11;
+    arr[4] = 13;
+    arr[5] = 15;
+    arr[6] = 17;
+    arr[7] = 19;
+    arr[8] = 21;
+    arr[9] = 23;
+    arr[10] = 25;
+    arr[11] = 27;
+    result = weightedReduce(12);
+    result = adjustResult(result);
+    print_i(result);
+    return 0;
+}
+
+int weightedReduce(int n) {
+    int i;
+    int sum;
+    int temp;
+    i = 0;
+    sum = 0;
+    while (i < n) {
+        temp = arr[i] * weight;
+        sum = sum + temp;
+        i = i + 1;
     }
-    i = i + 1;
-  }
-  final_result = sum + temp;
-  print_i(final_result);
-  print_s((char*)"Tricky edge jumps test passed");
-  return 0;
+    return sum;
+}
+
+int adjustResult(int val) {
+    int finalVal;
+    finalVal = val - adjust;
+    return finalVal;
 }

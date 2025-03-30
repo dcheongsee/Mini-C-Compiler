@@ -4,36 +4,39 @@ import gen.asm.Register;
 import java.util.*;
 
 public final class InterferenceGraph {
-
+    // map each virtual register to the set of virtual registers it interferes with
     private final Map<Register.Virtual, Set<Register.Virtual>> adj = new HashMap<>();
+    // for all virtual registers encountered
     private final Set<Register.Virtual> all = new HashSet<>();
-
-    // track usage for each VR
+    // usage counts for spill heuristics
     private final Map<Register.Virtual, Integer> usage = new HashMap<>();
 
     public void build(CFGBuilder.CFG cfg) {
-        // Gather registers and usage counts from basic blocks.
-        for (var block : cfg.blocks) {
-            for (var u : block.use) {
+        // gather all virtual registers and usage counts
+        for (var n : cfg.nodes) {
+            for (var u : n.uses) {
                 usage.put(u, usage.getOrDefault(u, 0) + 1);
             }
-            all.addAll(block.in);
-            all.addAll(block.out);
-            all.addAll(block.use);
-            all.addAll(block.def);
+            if (n.def != null) {
+                all.add(n.def);
+            }
+            all.addAll(n.in);
+            all.addAll(n.out);
+            all.addAll(n.uses);
         }
         for (var v : all) {
             adj.putIfAbsent(v, new HashSet<>());
             usage.putIfAbsent(v, 0);
         }
-        // Add interference edges: for each block, each register defined interferes with every register live out.
-        for (var block : cfg.blocks) {
-            for (var r : block.def) {
-                for (var s : block.out) {
-                    if (!r.equals(s)) {
-                        adj.get(r).add(s);
-                        adj.get(s).add(r);
-                    }
+        // for each node, add interference edges among all registers simultaneously live
+        for (var n : cfg.nodes) {
+            var liveList = new ArrayList<>(n.out);
+            for (int i = 0; i < liveList.size(); i++) {
+                for (int j = i + 1; j < liveList.size(); j++) {
+                    var a = liveList.get(i);
+                    var b = liveList.get(j);
+                    adj.get(a).add(b);
+                    adj.get(b).add(a);
                 }
             }
         }
