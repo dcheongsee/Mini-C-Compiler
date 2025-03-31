@@ -1,80 +1,64 @@
 package regalloc;
 
-import gen.asm.*;
+import gen.asm.Register;
 import java.util.*;
 
-public class InterferenceGraph {
+public final class InterferenceGraph {
+    // map each virtual register to the set of virtual registers it interferes with
+    private final Map<Register.Virtual, Set<Register.Virtual>> adj = new HashMap<>();
+    // for all virtual registers encountered
+    private final Set<Register.Virtual> all = new HashSet<>();
+    // usage counts for spill heuristics
+    private final Map<Register.Virtual, Integer> usage = new HashMap<>();
 
-    private final Map<Register, Set<Register>> adjacency = new HashMap<>();
-    private final Map<Register, Integer> usageCount = new HashMap<>();
-
-    public void build(ControlFlowGraph cfg) {
-        // collect all virtual registers and count usage
-        Set<Register> vregs = new HashSet<>();
-        for (Instruction instr : cfg.getBlocks().stream().flatMap(b -> b.instructions.stream()).toList()) {
-            for (Register r : instr.uses()) {
-                if (r.isVirtual()) {
-                    vregs.add(r);
-                    usageCount.put(r, usageCount.getOrDefault(r, 0) + 1);
-                }
+    public void build(CFGBuilder.CFG cfg) {
+        // gather all virtual registers and usage counts
+        for (var n : cfg.nodes) {
+            for (var u : n.uses) {
+                usage.put(u, usage.getOrDefault(u, 0) + 1);
             }
-            Register d = instr.def();
-            if (d != null && d.isVirtual()) {
-                vregs.add(d);
-                usageCount.put(d, usageCount.getOrDefault(d, 0) + 1);
+            if (n.def != null) {
+                all.add(n.def);
             }
+            all.addAll(n.in);
+            all.addAll(n.out);
+            all.addAll(n.uses);
         }
-        for (Register r : vregs) {
-            adjacency.put(r, new HashSet<>());
+        for (var v : all) {
+            adj.putIfAbsent(v, new HashSet<>());
+            usage.putIfAbsent(v, 0);
         }
-
-        // add interference edges using local liveness
-        for (ControlFlowGraph.BasicBlock block : cfg.getBlocks()) {
-            List<Set<Register>> localLiveness = LivenessAnalysis.computeLocalLiveness(block);
-            for (Set<Register> liveSet : localLiveness) {
-                List<Register> liveList = new ArrayList<>(liveSet);
-                for (int i = 0; i < liveList.size(); i++) {
-                    for (int j = i + 1; j < liveList.size(); j++) {
-                        Register r1 = liveList.get(i);
-                        Register r2 = liveList.get(j);
-                        if (!r1.equals(r2)) {
-                            adjacency.get(r1).add(r2);
-                            adjacency.get(r2).add(r1);
-                        }
-                    }
+        // for each node, add interference edges among all registers simultaneously live
+        for (var n : cfg.nodes) {
+            var liveList = new ArrayList<>(n.out);
+            for (int i = 0; i < liveList.size(); i++) {
+                for (int j = i + 1; j < liveList.size(); j++) {
+                    var a = liveList.get(i);
+                    var b = liveList.get(j);
+                    adj.get(a).add(b);
+                    adj.get(b).add(a);
                 }
-            }
-            // add edges between defined registers and live-out registers
-            int idx = 0;
-            for (Instruction instr : block.instructions) {
-                Register d = instr.def();
-                if (d != null && d.isVirtual()) {
-                    Set<Register> liveAfter = localLiveness.get(idx);
-                    for (Register r : liveAfter) {
-                        if (!r.equals(d)) {
-                            adjacency.get(d).add(r);
-                            adjacency.get(r).add(d);
-                        }
-                    }
-                }
-                idx++;
             }
         }
     }
 
-    public Set<Register> getNeighbors(Register r) {
-        return adjacency.getOrDefault(r, Collections.emptySet());
+    public int degree(Register.Virtual v, Set<Register.Virtual> removed) {
+        int d = 0;
+        for (var x : adj.getOrDefault(v, Set.of())) {
+            if (!removed.contains(x)) d++;
+        }
+        return d;
     }
 
-    public int getDegree(Register r) {
-        return adjacency.getOrDefault(r, Collections.emptySet()).size();
+    public Set<Register.Virtual> neighbors(Register.Virtual v) {
+        return adj.getOrDefault(v, Set.of());
     }
 
-    public int getUsage(Register r) {
-        return usageCount.getOrDefault(r, 0);
+    public Set<Register.Virtual> vertices() {
+        return all;
     }
 
-    public Set<Register> getAllRegisters() {
-        return adjacency.keySet();
+    public int usage(Register.Virtual v) {
+        return usage.getOrDefault(v, 0);
     }
 }

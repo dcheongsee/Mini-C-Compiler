@@ -1,70 +1,89 @@
 package regalloc;
 
-import gen.asm.*;
+import gen.asm.Register;
 import java.util.*;
 
-public class LivenessAnalysis {
+public final class LivenessAnalysis {
 
-    public static void run(ControlFlowGraph cfg) {
-        // compute use and def sets for each block
-        for (ControlFlowGraph.BasicBlock block : cfg.getBlocks()) {
-            for (Instruction instr : block.instructions) {
-                for (Register r : instr.uses()) {
-                    if (!block.def.contains(r) && r.isVirtual()) {
-                        block.use.add(r);
-                    }
-                }
-                Register d = instr.def();
-                if (d != null && d.isVirtual()) {
-                    block.def.add(d);
-                }
-            }
-        }
-
-        // worklist algorithm for block-level liveness analysis
-        Queue<ControlFlowGraph.BasicBlock> worklist = new LinkedList<>(cfg.getBlocks());
-        while (!worklist.isEmpty()) {
-            ControlFlowGraph.BasicBlock block = worklist.poll();
-            Set<Register> oldLiveIn = new HashSet<>(block.liveIn);
-            Set<Register> oldLiveOut = new HashSet<>(block.liveOut);
-
-            block.liveOut.clear();
-            for (ControlFlowGraph.BasicBlock succ : block.successors) {
-                block.liveOut.addAll(succ.liveIn);
-            }
-            Set<Register> newLiveIn = new HashSet<>(block.use);
-            Set<Register> diff = new HashSet<>(block.liveOut);
-            diff.removeAll(block.def);
-            newLiveIn.addAll(diff);
-            block.liveIn = newLiveIn;
-
-            if (!block.liveIn.equals(oldLiveIn) || !block.liveOut.equals(oldLiveOut)) {
-                worklist.addAll(block.predecessors);
-            }
+    public static void run(CFGBuilder.CFG cfg) {
+        // we repeatedly remove dead definitions and rerun the liveness fixpoint
+        // so that if removing one instruction causes another to be dead, we catch it
+        boolean done = false;
+        while (!done) {
+            // remove nodes defining unused VR
+            boolean removed = removeDeadDefs(cfg);
+            // then compute a fixpoint for in/out sets
+            boolean changed = livenessFixpoint(cfg);
+            // if we neither removed nor updated liveness, we are done
+            done = !removed && !changed;
         }
     }
 
-    // compute local (per-instruction) liveness for a given basic block
-    public static List<Set<Register>> computeLocalLiveness(ControlFlowGraph.BasicBlock block) {
-        List<Set<Register>> liveAfter = new ArrayList<>();
-        int n = block.instructions.size();
-        for (int i = 0; i < n; i++) {
-            liveAfter.add(new HashSet<>());
-        }
-        Set<Register> live = new HashSet<>(block.liveOut);
-        for (int i = n - 1; i >= 0; i--) {
-            Instruction instr = block.instructions.get(i);
-            liveAfter.set(i, new HashSet<>(live));
-            Register d = instr.def();
-            if (d != null && d.isVirtual()) {
-                live.remove(d);
-            }
-            for (Register r : instr.uses()) {
-                if (r.isVirtual()) {
-                    live.add(r);
+    // standard while not stable pass to compute in/out sets
+    private static boolean livenessFixpoint(CFGBuilder.CFG cfg) {
+        boolean changedOverall = false;
+        boolean stable = false;
+        while (!stable) {
+            stable = true;
+            for (int i = cfg.nodes.size() - 1; i >= 0; i--) {
+                var n = cfg.nodes.get(i);
+                // snapshot old sets
+                var oldIn = new HashSet<>(n.in);
+                var oldOut = new HashSet<>(n.out);
+
+                n.out.clear();
+                // union of successors' in
+                for (var s : n.succ) {
+                    n.out.addAll(s.in);
+                }
+                // remove def from out
+                var tmp = new HashSet<>(n.out);
+                if (n.def != null) {
+                    tmp.remove(n.def);
+                }
+                // in = uses plus out minus def
+                n.in = new HashSet<>(n.uses);
+                n.in.addAll(tmp);
+
+                // detect changes
+                if (!n.in.equals(oldIn) || !n.out.equals(oldOut)) {
+                    stable = false;
+                    changedOverall = true;
                 }
             }
         }
-        return liveAfter;
+        return changedOverall;
+    }
+
+    private static boolean removeDeadDefs(CFGBuilder.CFG cfg) {
+        // count overall usage
+        Map<Register.Virtual, Integer> usage = new HashMap<>();
+        for (var n : cfg.nodes) {
+            for (var u : n.uses) {
+                usage.put(u, usage.getOrDefault(u, 0) + 1);
+            }
+        }
+        // find nodes with def never used
+        Set<CFGBuilder.CFGNode> dead = new HashSet<>();
+        for (var n : cfg.nodes) {
+            if (n.def != null && usage.getOrDefault(n.def, 0) == 0) {
+                dead.add(n);
+            }
+        }
+        if (dead.isEmpty()) {
+            // nothing to remove
+            return false;
+        }
+        // remove them fully
+        for (var d : dead) {
+            for (var p : d.pred) {
+                p.succ.remove(d);
+            }
+            for (var s : d.succ) {
+                s.pred.remove(d);
+            }
+        }
+        cfg.nodes.removeAll(dead);
+        return true;
     }
 }
