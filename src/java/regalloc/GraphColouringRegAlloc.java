@@ -127,22 +127,59 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         var newSec = new AssemblyProgram.TextSection();
         for (var item : sec.items) {
             if (item instanceof Instruction ins) {
-                Map<Register, Register> vrMap = new HashMap<>();
-                for (Register r : ins.uses()) {
-                    if (r.isVirtual() && map.containsKey(r) && map.get(r) != null) {
-                        vrMap.put(r, map.get(r));
+                if (ins == Instruction.Nullary.pushRegisters) {
+                    expandPushRegisters(newSec, map);
+                } else if (ins == Instruction.Nullary.popRegisters) {
+                    expandPopRegisters(newSec, map);
+                } else {
+                    Map<Register, Register> vrMap = new HashMap<>();
+                    for (Register r : ins.uses()) {
+                        if (r.isVirtual() && map.containsKey(r) && map.get(r) != null) {
+                            vrMap.put(r, map.get(r));
+                        }
                     }
+                    Register d = ins.def();
+                    if (d != null && d.isVirtual() && map.containsKey(d) && map.get(d) != null) {
+                        vrMap.put(d, map.get(d));
+                    }
+                    Instruction newIns = ins.rebuild(vrMap);
+                    newSec.emit(newIns);
                 }
-                Register d = ins.def();
-                if (d != null && d.isVirtual() && map.containsKey(d) && map.get(d) != null) {
-                    vrMap.put(d, map.get(d));
-                }
-                Instruction newIns = ins.rebuild(vrMap);
-                newSec.emit(newIns);
             } else if (item instanceof AssemblyTextItem ati) {
                 newSec.emit(ati);
             }
         }
         return newSec;
+    }
+
+    private void expandPushRegisters(AssemblyProgram.TextSection newSec, Map<Register, Register> map) {
+        List<Register> physicalRegs = new ArrayList<>();
+        for (Map.Entry<Register, Register> entry : map.entrySet()) {
+            if (entry.getValue() != null) { // not spilled
+                physicalRegs.add(entry.getValue());
+            }
+        }
+        // sort physical registers to ensure consistent order
+        physicalRegs.sort(Comparator.comparing(Register::toString));
+        for (Register reg : physicalRegs) {
+            newSec.emit(new Instruction.ArithmeticWithImmediate(OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, -4));
+            newSec.emit(new Instruction.Store(OpCode.SW, reg, Register.Arch.sp, 0));
+        }
+    }
+
+    private void expandPopRegisters(AssemblyProgram.TextSection newSec, Map<Register, Register> map) {
+        List<Register> physicalRegs = new ArrayList<>();
+        for (Map.Entry<Register, Register> entry : map.entrySet()) {
+            if (entry.getValue() != null) { // not spilled
+                physicalRegs.add(entry.getValue());
+            }
+        }
+        // sort physical registers to ensure consistent order
+        physicalRegs.sort(Comparator.comparing(Register::toString));
+        Collections.reverse(physicalRegs); // pop in reverse order
+        for (Register reg : physicalRegs) {
+            newSec.emit(new Instruction.Load(OpCode.LW, reg, Register.Arch.sp, 0));
+            newSec.emit(new Instruction.ArithmeticWithImmediate(OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, 4));
+        }
     }
 }
