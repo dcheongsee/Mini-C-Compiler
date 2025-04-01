@@ -6,8 +6,8 @@ import java.util.*;
 public final class LivenessAnalysis {
 
     public static void run(CFGBuilder.CFG cfg) {
-        // remove dead definitions: if a node defines a virtual register never used anywhere
-        removeDeadDefs(cfg);
+        // instead of removing dead definitions, we now keep them
+        // and add the defined register to the liveOut set at the end
         boolean changed = true;
         // compute a fixed point
         while (changed) {
@@ -35,29 +35,13 @@ public final class LivenessAnalysis {
                 }
             }
         }
+        // for instructions that define a register that is never used,
+        // add that register to the liveOut set (if not already present), just once
+        for (var n : cfg.nodes) {
+            if (n.def != null && !n.out.contains(n.def)) {
+                n.out.add(n.def);
+            }
+        }
     }
 
-    private static void removeDeadDefs(CFGBuilder.CFG cfg) {
-        Map<Register.Virtual, Integer> usage = new HashMap<>();
-        for (var n : cfg.nodes) {
-            for (var u : n.uses) {
-                usage.put(u, usage.getOrDefault(u, 0) + 1);
-            }
-        }
-        Set<CFGBuilder.CFGNode> dead = new HashSet<>();
-        for (var n : cfg.nodes) {
-            if (n.def != null && usage.getOrDefault(n.def, 0) == 0) {
-                dead.add(n);
-            }
-        }
-        for (var d : dead) {
-            for (var p : d.pred) {
-                p.succ.remove(d);
-            }
-            for (var s : d.succ) {
-                s.pred.remove(d);
-            }
-        }
-        cfg.nodes.removeAll(dead);
-    }
 }

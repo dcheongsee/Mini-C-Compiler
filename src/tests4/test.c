@@ -1,35 +1,16 @@
-int helper() {
-    int a;
-    int b;
-    int c;
-    int d;
-    int e;
-    int f;
-    int g;
-    int h;
-    int i;
-    int j;
-    int k;
-    int result;
-
-    a = 1;
-    b = 2;
-    c = 3;
-    d = 4;
-    e = 5;
-    f = 6;
-    g = 7;
-    h = 8;
-    i = 9;
-    j = 10;
-    k = 11;
-    result = a + b + c + d + e + f;
-    result = result + g + h + i + j + k;
-    return result;
-}
-
 int main() {
-    int res;
-    res = helper();
-    print_i(res);
+    int unused1;
+    int unused2;
+    int unused3;
+    int unused4;
+    int unused5;
+    int used;
+
+    unused1 = 10;
+    unused2 = 20;
+    unused3 = 30;
+    unused4 = 40;
+    unused5 = 50;
+    used = 100;
+    print_i(used);
 }
