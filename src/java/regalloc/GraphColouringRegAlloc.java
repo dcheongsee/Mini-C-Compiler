@@ -16,7 +16,10 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
             Register.Arch.t8, Register.Arch.t9,
             Register.Arch.s0, Register.Arch.s1, Register.Arch.s2, Register.Arch.s3,
-            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
+            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7,
+            // additional registers that must be preserved if test modifies them
+            Register.Arch.v0,  // if using or corrupting $v0 before syscalls
+            Register.Arch.a0   // if corrupting $a0, etc
     );
 
     @Override
