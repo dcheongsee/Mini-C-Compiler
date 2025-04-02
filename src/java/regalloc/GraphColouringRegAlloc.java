@@ -10,7 +10,7 @@ public class GraphColouringRegAlloc implements AssemblyPass {
     // map for tracking spilled virtual registers and their associated spill labels
     private final Map<Register.Virtual, Label> spillLabels = new HashMap<>();
 
-    // allowed physical registers for push/pop
+    // allowed physical registers for push/pop expansions
     private static final List<Register> ALLOWED_REGS = List.of(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
             Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
@@ -25,60 +25,46 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         newProg.dataSection.items.addAll(program.dataSection.items);
 
         for (var sec : program.textSections) {
+            // we'll work in-memory on the instructions until no spills remain
             List<AssemblyItem> work = new ArrayList<>(sec.items);
-            // multi–pass rewriting loop: allocate until no spills remain and no virtual registers remain
+
             while (true) {
-                ColorAttempt attempt = buildAndColor(work, /*reserveTwo=*/false);
-                if (attempt.spilled.isEmpty()) {
-                    List<AssemblyItem> patched = patchAll(attempt.section.items, attempt.map);
-                    if (containsVirtualRegisters(patched)) {
-                        // if some virtual registers remain (i.e. spilled ones that weren't rewritten),
-                        // collect them and rewrite them
-                        Set<Register.Virtual> stillVirtual = collectVirtualRegisters(patched);
-                        for (Register.Virtual vr : stillVirtual) {
-                            work = rewriteOneSpilledVR(work, vr);
-                        }
-                        // continue the loop to reallocate
-                        continue;
-                    } else {
-                        work = patched;
-                        break;
-                    }
-                }
-                ColorAttempt attempt2 = buildAndColor(work, /*reserveTwo=*/true);
-                if (attempt2.spilled.isEmpty()) {
-                    List<AssemblyItem> patched = patchAll(attempt2.section.items, attempt2.map);
-                    if (containsVirtualRegisters(patched)) {
-                        Set<Register.Virtual> stillVirtual = collectVirtualRegisters(patched);
-                        for (Register.Virtual vr : stillVirtual) {
-                            work = rewriteOneSpilledVR(work, vr);
-                        }
-                        continue;
-                    } else {
-                        work = patched;
-                        break;
-                    }
-                }
-                // if spills remain, pick one virtual register to rewrite
-                var s = attempt2.spilled.iterator().next();
-                work = rewriteOneSpilledVR(work, s);
-            }
-            work = expandPushPop(work);
-            AssemblyProgram.TextSection newSec = newProg.emitNewTextSection();
-            for (var ai : work) {
-                if (ai instanceof Instruction instr) {
-                    newSec.emit(instr);
-                } else if (ai instanceof AssemblyTextItem ati) {
-                    newSec.emit(ati);
+                // attempt a color pass
+                ColorAttempt attempt = buildAndColor(work);
+
+                if (!attempt.spilled.isEmpty()) {
+                    // if there are spills, pick one spilled VR to rewrite
+                    Register.Virtual s = attempt.spilled.iterator().next();
+                    work = rewriteOneSpilledVR(work, s);
+                    // then re-run the loop, building a new CFG and coloring again
                 } else {
-                    throw new RuntimeException("Unexpected assembly item: " + ai.getClass());
+                    // no spills => we can finalize by patching all VR to physical
+                    List<AssemblyItem> patched = patchAll(attempt.section.items, attempt.map);
+
+                    // expand push/pop pseudo-instructions
+                    patched = expandPushPop(patched);
+
+                    // Create final text section
+                    AssemblyProgram.TextSection newSec = newProg.emitNewTextSection();
+                    for (var ai : patched) {
+                        if (ai instanceof Instruction instr) {
+                            newSec.emit(instr);
+                        } else if (ai instanceof AssemblyTextItem ati) {
+                            newSec.emit(ati);
+                        } else {
+                            throw new RuntimeException("Unexpected assembly item: " + ai.getClass());
+                        }
+                    }
+                    break;
                 }
             }
         }
 
+        // emit labels for spilled VR memory slots
         for (var entry : spillLabels.entrySet()) {
+            Register.Virtual vr = entry.getKey();
             Label lbl = entry.getValue();
-            newProg.dataSection.emit(new Comment("Spill slot for " + entry.getKey()));
+            newProg.dataSection.emit(new Comment("Spill slot for " + vr));
             newProg.dataSection.emit(new Directive("align 2"));
             newProg.dataSection.emit(lbl);
             newProg.dataSection.emit(new Directive("space 4"));
@@ -87,14 +73,15 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return newProg;
     }
 
-    // helper structure for a color attempt
     private static class ColorAttempt {
         AssemblyProgram.TextSection section;
         Map<Register.Virtual, Register> map;
         Set<Register.Virtual> spilled;
     }
 
-    private ColorAttempt buildAndColor(List<AssemblyItem> items, boolean reserveTwo) {
+
+    private ColorAttempt buildAndColor(List<AssemblyItem> items) {
+        // collect items into a temporary text section
         var sec = new AssemblyProgram.TextSection();
         for (var it : items) {
             if (it instanceof Instruction ins) {
@@ -103,12 +90,19 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                 sec.emit(ati);
             }
         }
+
+        // build CFG, run liveness
         var cfg = CFGBuilder.build(sec);
         LivenessAnalysis.run(cfg);
+
+        // build interference graph, color
         var ig = new InterferenceGraph();
         ig.build(cfg);
-        var alloc = new ChaitinAllocator(reserveTwo);
+
+        // single color pass using all registers
+        var alloc = new ChaitinAllocator(false); // (the boolean is irrelevant now)
         var res = alloc.color(ig);
+
         ColorAttempt out = new ColorAttempt();
         out.section = sec;
         out.map = res.map();
@@ -128,10 +122,14 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                 boolean defsS = (d != null && d.equals(s));
 
                 if (!usesS && !defsS) {
+                    // no reference to s => no rewrite needed
                     newItems.add(it);
                 } else {
+                    // we rewrite references to s entirely in VR
                     Register tmp = Register.Virtual.create();
                     Map<Register, Register> regMap = new HashMap<>();
+
+                    // if the instruction uses s, load it into a fresh VR 'tmp'
                     if (usesS) {
                         newItems.add(new Comment("load spilled " + s + " into " + tmp));
                         newItems.addAll(buildLoadOps(tmp, spillLbl));
@@ -141,11 +139,16 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                             }
                         }
                     }
+                    // if the instruction defines s, we rename the def to 'tmp'
                     if (defsS) {
                         regMap.put(s, tmp);
                     }
+
+                    // rebuild the original instruction with 'tmp' in place of s
                     Instruction rebuilt = instr.rebuild(regMap);
                     newItems.add(rebuilt);
+
+                    // if the instruction defines s, store 'tmp' back to memory
                     if (defsS) {
                         newItems.add(new Comment("store spilled " + s + " from " + tmp));
                         newItems.addAll(buildStoreOps(tmp, spillLbl));
@@ -180,8 +183,11 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             if (it instanceof Instruction instr) {
                 Map<Register, Register> regMap = new HashMap<>();
                 for (Register r : instr.registers()) {
-                    if (r.isVirtual() && coloring.containsKey(r)) {
-                        regMap.put(r, coloring.get(r));
+                    if (r.isVirtual()) {
+                        Register.Virtual vr = (Register.Virtual) r;
+                        if (coloring.containsKey(vr) && coloring.get(vr) != null) {
+                            regMap.put(r, coloring.get(vr));
+                        }
                     }
                 }
                 Instruction patched = instr.rebuild(regMap);
@@ -251,34 +257,5 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             newItems.add(it);
         }
         return newItems;
-    }
-
-    // helper: check if any instruction still contains a virtual register
-    private boolean containsVirtualRegisters(List<AssemblyItem> items) {
-        for (AssemblyItem it : items) {
-            if (it instanceof Instruction instr) {
-                for (Register r : instr.registers()) {
-                    if (r.isVirtual()) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    // helper: collect all virtual registers appearing in instructions
-    private Set<Register.Virtual> collectVirtualRegisters(List<AssemblyItem> items) {
-        Set<Register.Virtual> result = new HashSet<>();
-        for (AssemblyItem it : items) {
-            if (it instanceof Instruction instr) {
-                for (Register r : instr.registers()) {
-                    if (r.isVirtual()) {
-                        result.add((Register.Virtual) r);
-                    }
-                }
-            }
-        }
-        return result;
     }
 }

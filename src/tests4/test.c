@@ -1,16 +1,51 @@
 int main() {
-    int unused1;
-    int unused2;
-    int unused3;
-    int unused4;
-    int unused5;
-    int used;
-
-    unused1 = 10;
-    unused2 = 20;
-    unused3 = 30;
-    unused4 = 40;
-    unused5 = 50;
-    used = 100;
-    print_i(used);
+    int x1;
+    int x2;
+    int x3;
+    int x4;
+    int x5;
+    int y1;
+    int y2;
+    int y3;
+    int y4;
+    int y5;
+    int z1;
+    int z2;
+    int z3;
+    int z4;
+    int z5;
+    int i;
+    int result;
+    x1 = 1;
+    x2 = 2;
+    x3 = 3;
+    x4 = 4;
+    x5 = 5;
+    y1 = 10;
+    y2 = 20;
+    y3 = 30;
+    y4 = 40;
+    y5 = 50;
+    z1 = 0;
+    z2 = 0;
+    z3 = 0;
+    z4 = 0;
+    z5 = 0;
+    i = 0;
+    while (i < 4) {
+        z1 = x1 + y1;
+        x1 = z1 + x2;
+        z2 = x2 + y2;
+        x2 = z2 + x3;
+        z3 = x3 + y3;
+        x3 = z3 + x4;
+        z4 = x4 + y4;
+        x4 = z4 + x5;
+        z5 = x5 + y5;
+        x5 = z5 + z1;
+        i = i + 1;
+    }
+    result = z1 + z2 + z3 + z4 + z5;
+    print_i(result);
+    return 0;
 }
