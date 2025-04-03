@@ -10,9 +10,6 @@ public class GraphColouringRegAlloc implements AssemblyPass {
     // map for tracking spilled virtual registers and their associated spill labels
     private final Map<Register.Virtual, Label> spillLabels = new HashMap<>();
 
-    // added: set to track special virtual registers (used for spilling)
-    private final Set<Register.Virtual> specialTemps = new HashSet<>();
-
     // allowed physical registers for push/pop expansions
     private static final List<Register> ALLOWED_REGS = List.of(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
@@ -101,8 +98,8 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         var ig = new InterferenceGraph();
         ig.build(cfg);
 
-        // single color pass using all registers; pass the specialTemps set to avoid spilling them
-        var alloc = new ChaitinAllocator(false, specialTemps);
+        // single color pass using all registers
+        var alloc = new ChaitinAllocator(false); // (the boolean is irrelevant now)
         var res = alloc.color(ig);
 
         ColorAttempt out = new ColorAttempt();
@@ -128,8 +125,7 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                     newItems.add(it);
                 } else {
                     // we rewrite references to s entirely in VR
-                    Register.Virtual tmp = Register.Virtual.create();
-                    specialTemps.add(tmp); // mark tmp as special
+                    Register tmp = Register.Virtual.create();
                     Map<Register, Register> regMap = new HashMap<>();
 
                     // if the instruction uses s, load it into a fresh VR 'tmp'
@@ -164,19 +160,17 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return newItems;
     }
 
-    private List<AssemblyItem> buildLoadOps(Register.Virtual tmp, Label lbl) {
+    private List<AssemblyItem> buildLoadOps(Register tmp, Label lbl) {
         List<AssemblyItem> ops = new ArrayList<>();
-        Register.Virtual addr = Register.Virtual.create();
-        specialTemps.add(addr); // mark addr as special
+        Register addr = Register.Virtual.create();
         ops.add(new Instruction.LoadAddress(addr, lbl));
         ops.add(new Instruction.Load(OpCode.LW, tmp, addr, 0));
         return ops;
     }
 
-    private List<AssemblyItem> buildStoreOps(Register.Virtual tmp, Label lbl) {
+    private List<AssemblyItem> buildStoreOps(Register tmp, Label lbl) {
         List<AssemblyItem> ops = new ArrayList<>();
-        Register.Virtual addr = Register.Virtual.create();
-        specialTemps.add(addr); // mark addr as special
+        Register addr = Register.Virtual.create();
         ops.add(new Instruction.LoadAddress(addr, lbl));
         ops.add(new Instruction.Store(OpCode.SW, tmp, addr, 0));
         return ops;
@@ -204,83 +198,121 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return out;
     }
 
-    // modified push/pop expansion: compute a fresh list of registers to push/pop for each pseudo-instruction
+
     private List<AssemblyItem> expandPushPop(List<AssemblyItem> items) {
         List<AssemblyItem> newItems = new ArrayList<>();
-        for (var it : items) {
-            if (it instanceof Instruction instr) {
-                if (instr instanceof Instruction.Nullary nullaryInstr) {
-                    if (nullaryInstr == Instruction.Nullary.pushRegisters) {
-                        // recompute the list of used architectural registers for this push
-                        Set<Register> usedPhysRegs = new HashSet<>();
-                        for (var it2 : items) {
-                            if (it2 instanceof Instruction instr2) {
-                                for (Register r : instr2.registers()) {
-                                    if (!r.isVirtual() && ALLOWED_REGS.contains(r)) {
-                                        usedPhysRegs.add(r);
-                                    }
-                                }
+
+        // we'll treat each push/pop pair as a scope tracking which registers get used
+        // between them. Nested scopes are allowed and each pop will expand the matching push
+        Deque<Scope> scopeStack = new ArrayDeque<>();
+
+        for (AssemblyItem it : items) {
+            if (!(it instanceof Instruction instr)) {
+                newItems.add(it);
+                continue;
+            }
+
+            // check if it's a push or pop instruction
+            if (instr instanceof Instruction.Nullary nullaryInstr) {
+                if (nullaryInstr == Instruction.Nullary.pushRegisters) {
+                    int placeholderIndex = newItems.size();
+                    newItems.add(new Comment("<< PUSH PLACEHOLDER >>"));
+                    scopeStack.push(new Scope(placeholderIndex));
+                    continue;
+                } else if (nullaryInstr == Instruction.Nullary.popRegisters) {
+                    if (scopeStack.isEmpty()) {
+                        throw new RuntimeException("popRegisters with no matching pushRegisters!");
+                    }
+                    Scope scope = scopeStack.pop();
+
+                    // determine which registers were used in this scope (both physical and spilled)
+                    List<Register> regsToSave = new ArrayList<>(scope.used);
+                    regsToSave.sort(Comparator.comparing(Register::toString));
+
+                    // expand the push placeholder
+                    if (!regsToSave.isEmpty()) {
+                        newItems.set(scope.placeholderIndex,
+                                new Instruction.ArithmeticWithImmediate(
+                                        OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, -4 * regsToSave.size()
+                                )
+                        );
+                        int insertPos = scope.placeholderIndex + 1;
+                        for (int i = 0; i < regsToSave.size(); i++) {
+                            Register r = regsToSave.get(i);
+                            if (r.isVirtual() && spillLabels.containsKey((Register.Virtual) r)) {
+                                // for spilled registers, load the value from its spill slot into a temporary register, then push that temporary
+                                Label lbl = spillLabels.get((Register.Virtual) r);
+                                Register tmp = Register.Virtual.create();
+                                newItems.add(insertPos + i, new Comment("push spilled " + r));
+                                newItems.add(insertPos + i + 1, new Instruction.LoadAddress(tmp, lbl));
+                                newItems.add(insertPos + i + 2, new Instruction.Load(OpCode.LW, tmp, tmp, 0));
+                                newItems.add(insertPos + i + 3, new Instruction.Store(OpCode.SW, tmp, Register.Arch.sp, 4 * i));
+                                i += 3; // adjust for the extra instructions inserted
+                            } else {
+                                // for physical registers, push directly
+                                newItems.add(insertPos + i,
+                                        new Instruction.Store(OpCode.SW, r, Register.Arch.sp, 4 * i)
+                                );
                             }
                         }
-                        List<Register> regsToPush = new ArrayList<>();
-                        for (Register r : ALLOWED_REGS) {
-                            if (usedPhysRegs.contains(r)) {
-                                regsToPush.add(r);
+                    } else {
+                        newItems.set(scope.placeholderIndex,
+                                new Comment("pushRegisters: no registers used in this scope")
+                        );
+                    }
+
+                    // now expand the pop
+                    if (!regsToSave.isEmpty()) {
+                        for (int i = 0; i < regsToSave.size(); i++) {
+                            Register r = regsToSave.get(regsToSave.size() - 1 - i);
+                            if (r.isVirtual() && spillLabels.containsKey((Register.Virtual) r)) {
+                                // for spilled registers, pop into a temporary register and then store it back to the spill slot
+                                Label lbl = spillLabels.get((Register.Virtual) r);
+                                Register tmp = Register.Virtual.create();
+                                newItems.add(new Instruction.Load(OpCode.LW, tmp, Register.Arch.sp, 4 * i));
+                                Register addr = Register.Virtual.create();
+                                newItems.add(new Instruction.LoadAddress(addr, lbl));
+                                newItems.add(new Instruction.Store(OpCode.SW, tmp, addr, 0));
+                            } else {
+                                newItems.add(new Instruction.Load(OpCode.LW, r, Register.Arch.sp, 4 * i));
                             }
                         }
-                        int n = regsToPush.size();
-                        List<AssemblyItem> expansion = new ArrayList<>();
-                        if (n > 0) {
-                            expansion.add(new Instruction.ArithmeticWithImmediate(
-                                    OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, -n * 4));
-                            int offset = 0;
-                            for (Register r : regsToPush) {
-                                expansion.add(new Instruction.Store(
-                                        OpCode.SW, r, Register.Arch.sp, offset));
-                                offset += 4;
-                            }
-                        }
-                        newItems.addAll(expansion);
-                        continue;
-                    } else if (nullaryInstr == Instruction.Nullary.popRegisters) {
-                        // recompute the list of used architectural registers for this pop
-                        Set<Register> usedPhysRegs = new HashSet<>();
-                        for (var it2 : items) {
-                            if (it2 instanceof Instruction instr2) {
-                                for (Register r : instr2.registers()) {
-                                    if (!r.isVirtual() && ALLOWED_REGS.contains(r)) {
-                                        usedPhysRegs.add(r);
-                                    }
-                                }
-                            }
-                        }
-                        List<Register> regsToPush = new ArrayList<>();
-                        for (Register r : ALLOWED_REGS) {
-                            if (usedPhysRegs.contains(r)) {
-                                regsToPush.add(r);
-                            }
-                        }
-                        int n = regsToPush.size();
-                        List<AssemblyItem> expansion = new ArrayList<>();
-                        if (n > 0) {
-                            List<Register> rev = new ArrayList<>(regsToPush);
-                            Collections.reverse(rev);
-                            int offset = 0;
-                            for (Register r : rev) {
-                                expansion.add(new Instruction.Load(
-                                        OpCode.LW, r, Register.Arch.sp, offset));
-                                offset += 4;
-                            }
-                            expansion.add(new Instruction.ArithmeticWithImmediate(
-                                    OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, n * 4));
-                        }
-                        newItems.addAll(expansion);
-                        continue;
+                        newItems.add(new Instruction.ArithmeticWithImmediate(
+                                OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, 4 * regsToSave.size()
+                        ));
+                    } else {
+                        newItems.add(new Comment("popRegisters: no registers used in this scope"));
+                    }
+                    continue;
+                }
+            }
+
+            newItems.add(it);
+            if (!scopeStack.isEmpty()) {
+                Scope currentScope = scopeStack.peek();
+                // record usage: add both physical registers and spilled virtual registers
+                for (Register r : instr.registers()) {
+                    if ((!r.isVirtual() && ALLOWED_REGS.contains(r)) ||
+                            (r.isVirtual() && spillLabels.containsKey((Register.Virtual) r))) {
+                        currentScope.used.add(r);
                     }
                 }
             }
-            newItems.add(it);
+        }
+
+        if (!scopeStack.isEmpty()) {
+            throw new RuntimeException("pushRegisters without a matching popRegisters!");
         }
         return newItems;
+    }
+
+    // simple helper class: each scope tracks where we inserted the push placeholder plus a set of used registers
+    private static final class Scope {
+        final int placeholderIndex;
+        final Set<Register> used = new HashSet<>();
+
+        Scope(int placeholderIndex) {
+            this.placeholderIndex = placeholderIndex;
+        }
     }
 }
