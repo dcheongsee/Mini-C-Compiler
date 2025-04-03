@@ -204,29 +204,31 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return out;
     }
 
+    // modified push/pop expansion: compute a fresh list of registers to push/pop for each pseudo-instruction
     private List<AssemblyItem> expandPushPop(List<AssemblyItem> items) {
         List<AssemblyItem> newItems = new ArrayList<>();
-        Set<Register> usedPhysRegs = new HashSet<>();
-        for (var it : items) {
-            if (it instanceof Instruction instr) {
-                for (Register r : instr.registers()) {
-                    if (!r.isVirtual() && ALLOWED_REGS.contains(r)) {
-                        usedPhysRegs.add(r);
-                    }
-                }
-            }
-        }
-        List<Register> regsToPush = new ArrayList<>();
-        for (Register r : ALLOWED_REGS) {
-            if (usedPhysRegs.contains(r)) {
-                regsToPush.add(r);
-            }
-        }
-        int n = regsToPush.size();
         for (var it : items) {
             if (it instanceof Instruction instr) {
                 if (instr instanceof Instruction.Nullary nullaryInstr) {
                     if (nullaryInstr == Instruction.Nullary.pushRegisters) {
+                        // recompute the list of used architectural registers for this push
+                        Set<Register> usedPhysRegs = new HashSet<>();
+                        for (var it2 : items) {
+                            if (it2 instanceof Instruction instr2) {
+                                for (Register r : instr2.registers()) {
+                                    if (!r.isVirtual() && ALLOWED_REGS.contains(r)) {
+                                        usedPhysRegs.add(r);
+                                    }
+                                }
+                            }
+                        }
+                        List<Register> regsToPush = new ArrayList<>();
+                        for (Register r : ALLOWED_REGS) {
+                            if (usedPhysRegs.contains(r)) {
+                                regsToPush.add(r);
+                            }
+                        }
+                        int n = regsToPush.size();
                         List<AssemblyItem> expansion = new ArrayList<>();
                         if (n > 0) {
                             expansion.add(new Instruction.ArithmeticWithImmediate(
@@ -241,6 +243,24 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                         newItems.addAll(expansion);
                         continue;
                     } else if (nullaryInstr == Instruction.Nullary.popRegisters) {
+                        // recompute the list of used architectural registers for this pop
+                        Set<Register> usedPhysRegs = new HashSet<>();
+                        for (var it2 : items) {
+                            if (it2 instanceof Instruction instr2) {
+                                for (Register r : instr2.registers()) {
+                                    if (!r.isVirtual() && ALLOWED_REGS.contains(r)) {
+                                        usedPhysRegs.add(r);
+                                    }
+                                }
+                            }
+                        }
+                        List<Register> regsToPush = new ArrayList<>();
+                        for (Register r : ALLOWED_REGS) {
+                            if (usedPhysRegs.contains(r)) {
+                                regsToPush.add(r);
+                            }
+                        }
+                        int n = regsToPush.size();
                         List<AssemblyItem> expansion = new ArrayList<>();
                         if (n > 0) {
                             List<Register> rev = new ArrayList<>(regsToPush);
