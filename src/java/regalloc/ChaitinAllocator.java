@@ -17,9 +17,13 @@ public final class ChaitinAllocator {
     public record Result(Map<Register.Virtual,Register> map, Set<Register.Virtual> spilled) {}
 
     private final boolean reserveTwo;
+    // set of virtual registers that are marked as special (used for spilling) and must not be spilled
+    private final Set<Register.Virtual> special;
 
-    public ChaitinAllocator(boolean reserveTwo) {
+    // modified constructor to accept the special registers set.
+    public ChaitinAllocator(boolean reserveTwo, Set<Register.Virtual> special) {
         this.reserveTwo = reserveTwo;
+        this.special = special;
     }
 
     public Result color(InterferenceGraph ig) {
@@ -38,11 +42,18 @@ public final class ChaitinAllocator {
 
         while (true) {
             boolean foundAny = true;
-            // repeatedly remove any node with degree < k
+            // repeatedly remove any node with degree < k or if it is special (never spill it)
             while (foundAny) {
                 foundAny = false;
                 for (var v : ig.vertices()) {
                     if (removed.contains(v)) continue;
+                    // if v is special, remove it immediately (never spilled)
+                    if (special.contains(v)) {
+                        stack.push(v);
+                        removed.add(v);
+                        foundAny = true;
+                        break;
+                    }
                     int deg = ig.degree(v, removed);
                     if (deg < k) {
                         stack.push(v);
@@ -65,28 +76,42 @@ public final class ChaitinAllocator {
                 break;
             }
 
-            // select a victim to spill
-            remain.sort((a, b) -> {
-                int degA = ig.degree(a, removed);
-                int degB = ig.degree(b, removed);
-                if (degA != degB) {
-                    // descending order by degree
-                    return Integer.compare(degB, degA);
+            // select a victim to spill from non-special ones
+            List<Register.Virtual> nonSpecial = new ArrayList<>();
+            for (var v : remain) {
+                if (!special.contains(v)) {
+                    nonSpecial.add(v);
                 }
-                // tie => compare usage, but now ascending (least usage first!)
-                int useA = ig.usage(a);
-                int useB = ig.usage(b);
-                if (useA != useB) {
-                    return Integer.compare(useA, useB);
+            }
+            if (!nonSpecial.isEmpty()) {
+                nonSpecial.sort((a, b) -> {
+                    int degA = ig.degree(a, removed);
+                    int degB = ig.degree(b, removed);
+                    if (degA != degB) {
+                        // descending order by degree
+                        return Integer.compare(degB, degA);
+                    }
+                    // tie => compare usage, but now ascending (least usage first!)
+                    int useA = ig.usage(a);
+                    int useB = ig.usage(b);
+                    if (useA != useB) {
+                        return Integer.compare(useA, useB);
+                    }
+                    // final tie => name ascending
+                    return a.toString().compareTo(b.toString());
+                });
+                Register.Virtual victim = nonSpecial.get(0);
+                stack.push(victim);
+                removed.add(victim);
+                spill.add(victim);
+            } else {
+                // if remain contains only special registers, remove them all
+                for (var v : remain) {
+                    stack.push(v);
+                    removed.add(v);
                 }
-                // final tie => name ascending
-                return a.toString().compareTo(b.toString());
-            });
-
-            Register.Virtual victim = remain.get(0);
-            stack.push(victim);
-            removed.add(victim);
-            spill.add(victim);
+                break;
+            }
         }
 
         Map<Register.Virtual,Register> assign = new HashMap<>();

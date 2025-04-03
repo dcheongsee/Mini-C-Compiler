@@ -10,16 +10,16 @@ public class GraphColouringRegAlloc implements AssemblyPass {
     // map for tracking spilled virtual registers and their associated spill labels
     private final Map<Register.Virtual, Label> spillLabels = new HashMap<>();
 
+    // added: set to track special virtual registers (used for spilling)
+    private final Set<Register.Virtual> specialTemps = new HashSet<>();
+
     // allowed physical registers for push/pop expansions
     private static final List<Register> ALLOWED_REGS = List.of(
             Register.Arch.t0, Register.Arch.t1, Register.Arch.t2, Register.Arch.t3,
             Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7,
             Register.Arch.t8, Register.Arch.t9,
             Register.Arch.s0, Register.Arch.s1, Register.Arch.s2, Register.Arch.s3,
-            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7,
-            // additional registers that must be preserved if test modifies them
-            Register.Arch.v0,  // if using or corrupting $v0 before syscalls
-            Register.Arch.a0   // if corrupting $a0, etc
+            Register.Arch.s4, Register.Arch.s5, Register.Arch.s6, Register.Arch.s7
     );
 
     @Override
@@ -82,7 +82,6 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         Set<Register.Virtual> spilled;
     }
 
-
     private ColorAttempt buildAndColor(List<AssemblyItem> items) {
         // collect items into a temporary text section
         var sec = new AssemblyProgram.TextSection();
@@ -102,8 +101,8 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         var ig = new InterferenceGraph();
         ig.build(cfg);
 
-        // single color pass using all registers
-        var alloc = new ChaitinAllocator(false); // (the boolean is irrelevant now)
+        // single color pass using all registers; pass the specialTemps set to avoid spilling them
+        var alloc = new ChaitinAllocator(false, specialTemps);
         var res = alloc.color(ig);
 
         ColorAttempt out = new ColorAttempt();
@@ -129,7 +128,8 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                     newItems.add(it);
                 } else {
                     // we rewrite references to s entirely in VR
-                    Register tmp = Register.Virtual.create();
+                    Register.Virtual tmp = Register.Virtual.create();
+                    specialTemps.add(tmp); // mark tmp as special
                     Map<Register, Register> regMap = new HashMap<>();
 
                     // if the instruction uses s, load it into a fresh VR 'tmp'
@@ -164,17 +164,19 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return newItems;
     }
 
-    private List<AssemblyItem> buildLoadOps(Register tmp, Label lbl) {
+    private List<AssemblyItem> buildLoadOps(Register.Virtual tmp, Label lbl) {
         List<AssemblyItem> ops = new ArrayList<>();
-        Register addr = Register.Virtual.create();
+        Register.Virtual addr = Register.Virtual.create();
+        specialTemps.add(addr); // mark addr as special
         ops.add(new Instruction.LoadAddress(addr, lbl));
         ops.add(new Instruction.Load(OpCode.LW, tmp, addr, 0));
         return ops;
     }
 
-    private List<AssemblyItem> buildStoreOps(Register tmp, Label lbl) {
+    private List<AssemblyItem> buildStoreOps(Register.Virtual tmp, Label lbl) {
         List<AssemblyItem> ops = new ArrayList<>();
-        Register addr = Register.Virtual.create();
+        Register.Virtual addr = Register.Virtual.create();
+        specialTemps.add(addr); // mark addr as special
         ops.add(new Instruction.LoadAddress(addr, lbl));
         ops.add(new Instruction.Store(OpCode.SW, tmp, addr, 0));
         return ops;
