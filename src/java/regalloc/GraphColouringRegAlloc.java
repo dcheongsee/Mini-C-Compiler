@@ -39,7 +39,7 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                     // then re-run the loop, building a new CFG and coloring again
                 } else {
                     // no spills => we can finalize by patching all VR to physical
-                    List<AssemblyItem> patched = patchAll(attempt.section.items, attempt.map);
+                    List<AssemblyItem> patched = patchAll(attempt.section.items, attempt.map, attempt.spilled);
 
                     // expand push/pop pseudo-instructions
                     patched = expandPushPop(patched);
@@ -176,21 +176,36 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return ops;
     }
 
-    private List<AssemblyItem> patchAll(List<AssemblyItem> items, Map<Register.Virtual, Register> coloring) {
+    // patchAll method to handle spilled registers by rewriting instructions accordingly
+    private List<AssemblyItem> patchAll(List<AssemblyItem> items, Map<Register.Virtual, Register> coloring, Set<Register.Virtual> spilled) {
         List<AssemblyItem> out = new ArrayList<>();
         for (var it : items) {
             if (it instanceof Instruction instr) {
-                Map<Register, Register> regMap = new HashMap<>();
+                boolean hasSpilled = false;
                 for (Register r : instr.registers()) {
                     if (r.isVirtual()) {
                         Register.Virtual vr = (Register.Virtual) r;
-                        if (coloring.containsKey(vr) && coloring.get(vr) != null) {
-                            regMap.put(r, coloring.get(vr));
+                        if (spilled.contains(vr)) {
+                            hasSpilled = true;
+                            break;
                         }
                     }
                 }
-                Instruction patched = instr.rebuild(regMap);
-                out.add(patched);
+                if (hasSpilled) {
+                    out.addAll(rewriteInstr(instr, coloring, spilled));
+                } else {
+                    Map<Register, Register> regMap = new HashMap<>();
+                    for (Register r : instr.registers()) {
+                        if (r.isVirtual()) {
+                            Register.Virtual vr = (Register.Virtual) r;
+                            if (coloring.containsKey(vr) && coloring.get(vr) != null) {
+                                regMap.put(r, coloring.get(vr));
+                            }
+                        }
+                    }
+                    Instruction patched = instr.rebuild(regMap);
+                    out.add(patched);
+                }
             } else {
                 out.add(it);
             }
@@ -198,6 +213,83 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return out;
     }
 
+    // helper to rewrite instructions that involve spilled registers
+    private List<AssemblyItem> rewriteInstr(Instruction ins, Map<Register.Virtual, Register> coloring, Set<Register.Virtual> spilled) {
+        List<AssemblyItem> out = new ArrayList<>();
+        Map<Register, Register> vm = new HashMap<>();
+        Register.Virtual defSpilled = null;
+        if (ins.def() instanceof Register.Virtual dv && spilled.contains(dv)) {
+            defSpilled = dv;
+        }
+        Set<Register.Virtual> spilledUses = new HashSet<>();
+        for (Register r : ins.uses()) {
+            if (r instanceof Register.Virtual vv && spilled.contains(vv)) {
+                if (defSpilled == null || !vv.equals(defSpilled)) {
+                    spilledUses.add(vv);
+                }
+            }
+        }
+        Register[] tempRegs = new Register[]{ Register.Arch.t0, Register.Arch.t2, Register.Arch.t3, Register.Arch.t4, Register.Arch.t5, Register.Arch.t6, Register.Arch.t7, Register.Arch.t8, Register.Arch.t9 };
+        int tempIndex = 0;
+        for (Register.Virtual vv : spilledUses) {
+            Register temp;
+            if (tempIndex < tempRegs.length) {
+                temp = tempRegs[tempIndex++];
+            } else {
+                temp = Register.Virtual.create();
+            }
+            Label spillLabel = spillLabels.get(vv);
+            if (spillLabel == null) {
+                spillLabel = Label.create("spill_" + vv);
+                spillLabels.put(vv, spillLabel);
+            }
+            out.add(new Instruction.LoadAddress(temp, spillLabel));
+            out.add(new Instruction.Load(OpCode.LW, temp, temp, 0));
+            vm.put(vv, temp);
+        }
+        for (Register r : ins.uses()) {
+            if (r instanceof Register.Virtual vv && !spilled.contains(vv)) {
+                vm.put(vv, coloring.get(vv));
+            }
+        }
+        Instruction rebuilt = ins.rebuild(vm);
+        if (defSpilled != null) {
+            Register tempDef = Register.Arch.t1;
+            rebuilt = rebuilt.rebuild(Collections.singletonMap(defSpilled, tempDef));
+            out.add(new Comment("orig " + ins));
+            out.add(rebuilt);
+            Label spillLabel = spillLabels.get(defSpilled);
+            if (spillLabel == null) {
+                spillLabel = Label.create("spill_" + defSpilled);
+                spillLabels.put(defSpilled, spillLabel);
+            }
+            out.add(new Instruction.LoadAddress(Register.Arch.t0, spillLabel));
+            out.add(new Instruction.Store(OpCode.SW, tempDef, Register.Arch.t0, 0));
+        } else if (ins.def() instanceof Register.Virtual dv) {
+            Register rd = coloring.get(dv);
+            if (rd == null) {
+                Register tempDef = Register.Arch.t1;
+                rebuilt = rebuilt.rebuild(Collections.singletonMap(dv, tempDef));
+                out.add(new Comment("orig " + ins));
+                out.add(rebuilt);
+                Label spillLabel = spillLabels.get(dv);
+                if (spillLabel == null) {
+                    spillLabel = Label.create("spill_" + dv);
+                    spillLabels.put(dv, spillLabel);
+                }
+                out.add(new Instruction.LoadAddress(Register.Arch.t0, spillLabel));
+                out.add(new Instruction.Store(OpCode.SW, tempDef, Register.Arch.t0, 0));
+            } else {
+                rebuilt = rebuilt.rebuild(Collections.singletonMap(dv, rd));
+                out.add(new Comment("orig " + ins));
+                out.add(rebuilt);
+            }
+        } else {
+            out.add(new Comment("orig " + ins));
+            out.add(rebuilt);
+        }
+        return out;
+    }
 
     private List<AssemblyItem> expandPushPop(List<AssemblyItem> items) {
         List<AssemblyItem> newItems = new ArrayList<>();
@@ -240,16 +332,14 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                         for (int i = 0; i < regsToSave.size(); i++) {
                             Register r = regsToSave.get(i);
                             if (r.isVirtual() && spillLabels.containsKey((Register.Virtual) r)) {
-                                // for spilled registers, load the value from its spill slot into a temporary register, then push that temporary
                                 Label lbl = spillLabels.get((Register.Virtual) r);
                                 Register tmp = Register.Virtual.create();
                                 newItems.add(insertPos + i, new Comment("push spilled " + r));
                                 newItems.add(insertPos + i + 1, new Instruction.LoadAddress(tmp, lbl));
                                 newItems.add(insertPos + i + 2, new Instruction.Load(OpCode.LW, tmp, tmp, 0));
                                 newItems.add(insertPos + i + 3, new Instruction.Store(OpCode.SW, tmp, Register.Arch.sp, 4 * i));
-                                i += 3; // adjust for the extra instructions inserted
+                                i += 3;
                             } else {
-                                // for physical registers, push directly
                                 newItems.add(insertPos + i,
                                         new Instruction.Store(OpCode.SW, r, Register.Arch.sp, 4 * i)
                                 );
@@ -266,7 +356,6 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                         for (int i = 0; i < regsToSave.size(); i++) {
                             Register r = regsToSave.get(regsToSave.size() - 1 - i);
                             if (r.isVirtual() && spillLabels.containsKey((Register.Virtual) r)) {
-                                // for spilled registers, pop into a temporary register and then store it back to the spill slot
                                 Label lbl = spillLabels.get((Register.Virtual) r);
                                 Register tmp = Register.Virtual.create();
                                 newItems.add(new Instruction.Load(OpCode.LW, tmp, Register.Arch.sp, 4 * i));
@@ -278,7 +367,7 @@ public class GraphColouringRegAlloc implements AssemblyPass {
                             }
                         }
                         newItems.add(new Instruction.ArithmeticWithImmediate(
-                                OpCode.ADDI, Register.Arch.sp, Register.Arch.sp, 4 * regsToSave.size()
+                                OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, 4 * regsToSave.size()
                         ));
                     } else {
                         newItems.add(new Comment("popRegisters: no registers used in this scope"));
@@ -290,7 +379,6 @@ public class GraphColouringRegAlloc implements AssemblyPass {
             newItems.add(it);
             if (!scopeStack.isEmpty()) {
                 Scope currentScope = scopeStack.peek();
-                // record usage: add both physical registers and spilled virtual registers
                 for (Register r : instr.registers()) {
                     if ((!r.isVirtual() && ALLOWED_REGS.contains(r)) ||
                             (r.isVirtual() && spillLabels.containsKey((Register.Virtual) r))) {
@@ -306,7 +394,6 @@ public class GraphColouringRegAlloc implements AssemblyPass {
         return newItems;
     }
 
-    // simple helper class: each scope tracks where we inserted the push placeholder plus a set of used registers
     private static final class Scope {
         final int placeholderIndex;
         final Set<Register> used = new HashSet<>();

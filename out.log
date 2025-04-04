@@ -1,7 +1,6 @@
 java.lang.Throwable:
-regalloc.GraphColouringRegAlloc.finalRewrite(GraphColouringRegAlloc.java:222)
-regalloc.GraphColouringRegAlloc.rewriteUntilNoSpill(GraphColouringRegAlloc.java:64)
-regalloc.GraphColouringRegAlloc.apply(GraphColouringRegAlloc.java:34)
-gen.CodeGenerator.emitProgram(CodeGenerator.java:59)
-Main4.compile(Main4.java:235)
+gen.asm.AssemblyParser.parseRegister(AssemblyParser.java:227)
+gen.asm.AssemblyParser.parseAssemblyItem(AssemblyParser.java:122)
+gen.asm.AssemblyParser.readAssemblyProgram(AssemblyParser.java:35)
+Main4.compile(Main4.java:258)
 Main4.main(Main4.java:72)
