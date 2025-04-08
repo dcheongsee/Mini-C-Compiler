@@ -215,17 +215,15 @@ public class TypeAnalyzer extends BaseSemanticAnalyzer {
 					rightType = leftType;
 				}
 
-				// handle assignment if both are class types then must check subtyping
+				// for class types, require exact type equality, implicit upcasting is disallowed
 				if (leftType instanceof ClassType cl && rightType instanceof ClassType cr) {
-					// we require cr <: cl
-					if (!classSubTypeOf(cr, cl)) {
-						error("Assignment type mismatch: " + cr + " is not a subtype of " + cl);
+					if (!cl.getName().equals(cr.getName())) {
+						error("Assignment type mismatch: cannot implicitly assign " + cr + " to " + cl + ". A cast is required.");
 						yield BaseType.UNKNOWN;
 					} else {
 						yield leftType;
 					}
-				}
-				else if (!leftType.equals(rightType)) {
+				} else if (!leftType.equals(rightType)) {
 					error("Assignment type mismatch: " + leftType + " does not match " + rightType);
 					yield BaseType.UNKNOWN;
 				} else {
