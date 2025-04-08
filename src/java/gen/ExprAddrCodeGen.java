@@ -75,7 +75,6 @@ public class ExprAddrCodeGen extends CodeGen {
                 yield addrReg;
             }
 
-
             // ArrayAccess, base address + (index * elemSize)
             case ArrayAccessExpr aa -> {
                 // get base address
@@ -97,10 +96,32 @@ public class ExprAddrCodeGen extends CodeGen {
                 yield finalAddr;
             }
 
-            // FieldAccess, struct base + offset of field
+            // FieldAccess, address = base address + field offset
             case FieldAccessExpr fa -> {
                 Register baseAddr = visit(fa.expr);
-                int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                int fieldOffset;
+                if (fa.expr.type instanceof StructType) {
+                    fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                } else if (fa.expr.type instanceof ClassType ct) {
+                    ClassDecl cd = lookupClassDecl(ct.getName());
+                    if (cd == null) {
+                        throw new RuntimeException("Class " + ct.getName() + " not found");
+                    }
+                    boolean found = false;
+                    fieldOffset = 0;
+                    for (VarDecl fld : cd.getFields()) {
+                        if (fld.name.equals(fa.field)) {
+                            fieldOffset = fld.offset;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        throw new RuntimeException("Field " + fa.field + " not found in class " + ct.getName());
+                    }
+                } else {
+                    throw new RuntimeException("Field access on non-struct and non-class type");
+                }
                 Register finalAddr = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, baseAddr, fieldOffset);
                 System.out.println("ExprAddrCodeGen: FieldAccessExpr on field '" + fa.field +
@@ -242,4 +263,13 @@ public class ExprAddrCodeGen extends CodeGen {
         throw new RuntimeException("Field " + fieldName + " not found in struct " + st.name);
     }
 
+    // lookup class declaration in the global AST
+    private ClassDecl lookupClassDecl(String className) {
+        for (Decl d : sem.SemanticAnalyzer.GlobalAST.decls) {
+            if (d instanceof ClassDecl cd && cd.getName().equals(className)) {
+                return cd;
+            }
+        }
+        return null;
+    }
 }

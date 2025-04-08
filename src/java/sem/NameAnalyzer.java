@@ -2,9 +2,14 @@ package sem;
 
 import ast.*;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class NameAnalyzer extends BaseSemanticAnalyzer {
 
 	private Scope currentScope = new Scope();
+	// stack to track the current enclosing class
+	private Deque<ClassDecl> classStack = new ArrayDeque<>();
 
 	public void visit(ASTNode node) {
 		switch (node) {
@@ -46,24 +51,38 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 				if (existingSym == null) {
 					currentScope.put(new FunctionSymbol(fd.name, fd));
 				} else if (existingSym instanceof FunctionSymbol fs) {
-					if (fs.decl instanceof FunDecl oldDecl) {
-						fs.decl = fd;
-					} else {
-						error("Function definition " + fd.name + " is already declared in this scope.");
-					}
+					// instead of erroring out when a definition is already present,
+					// update the symbol to point to this FunDef
+					fs.decl = fd;
 				} else {
 					error("Identifier " + fd.name + " does not refer to a function.");
 				}
 
-				// handle the parameters in a new scope
+				// create a new scope for the method's body
 				Scope prev = currentScope;
 				currentScope = new Scope(prev);
+
+				// for instance methods, inject the enclosing class’s fields (including inherited ones) into the method scope
+				if (fd.isInstanceMethod && !classStack.isEmpty()) {
+					ClassDecl enclosing = classStack.peek();
+					// inject inherited fields from all ancestors
+					injectInheritedFields(currentScope, enclosing);
+					// inject fields declared in the current (enclosing) class
+					for (VarDecl field : enclosing.getFields()) {
+						currentScope.put(new VariableSymbol(field.name, field));
+					}
+				}
+
+
+				// process the parameters
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
+				// process the method body
 				visit(fd.block);
 				currentScope = prev;
 			}
+
 
 			case Program p -> {
 				// process built‐in functions
@@ -140,6 +159,86 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 				}
 			}
 
+
+			// class declaration
+			case ClassDecl cd -> {
+				// check for duplicate class name in current scope
+				Symbol existingSym = currentScope.lookupCurrent(cd.getName());
+				if (existingSym != null) {
+					error("Class " + cd.getName() + " is already declared in this scope.");
+				} else {
+					currentScope.put(new ClassSymbol(cd.getName(), cd));
+				}
+
+				// if it has a parent, ensure that parent is declared as a class
+				if (cd.getParentName() != null) {
+					Symbol parentSym = currentScope.lookup(cd.getParentName());
+					if (parentSym == null) {
+						error("Parent class " + cd.getParentName() + " is not declared.");
+					} else if (!(parentSym instanceof ClassSymbol)) {
+						error("Identifier " + cd.getParentName() + " does not refer to a class.");
+					} else {
+						// check for inheritance cycle
+						checkInheritanceCycle(cd.getName(), ((ClassSymbol) parentSym).decl);
+					}
+				}
+
+				// create an inner scope for class members and push this class on the classStack
+				Scope prev = currentScope;
+				currentScope = new Scope(prev);
+				classStack.push(cd);
+
+				// add field declarations
+				for (VarDecl field : cd.getFields()) {
+					if (currentScope.lookupCurrent(field.name) != null) {
+						error("Field " + field.name + " is already declared in class " + cd.getName());
+					} else {
+						currentScope.put(new VariableSymbol(field.name, field));
+					}
+				}
+
+				// add method declarations
+				for (FunDef method : cd.getMethods()) {
+					Symbol mSym = currentScope.lookupCurrent(method.name);
+					if (mSym != null) {
+						error("Method " + method.name + " is already declared in class " + cd.getName());
+					} else {
+						currentScope.put(new FunctionSymbol(method.name, method));
+					}
+				}
+
+				// process each method body while the class scope (with the fields) is active
+				for (FunDef method : cd.getMethods()) {
+					visit(method);
+				}
+
+				classStack.pop();
+				currentScope = prev;
+			}
+
+
+			// instance function call
+			case InstanceFunCallExpr ifce -> {
+				// visit the object expression
+				visit(ifce.object);
+				// visit the arguments
+				for (Expr arg : ifce.args) {
+					visit(arg);
+				}
+			}
+
+			// new instance creation
+			case NewInstance ni -> {
+				// check that ni.classType is declared as a class
+				Symbol s = currentScope.lookup(ni.classType.getName());
+				if (s == null) {
+					error("Class " + ni.classType.getName() + " is not declared.");
+				} else if (!(s instanceof ClassSymbol)) {
+					error("Identifier " + ni.classType.getName() + " does not refer to a class.");
+				}
+			}
+
+			// all other ASTNodes (including Type, BinOp, etc.)
 			case Type t -> {
 				// nothing to do
 			}
@@ -181,6 +280,36 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 		}
 	}
 
+
+	 // new class symbol for part V
+	static class ClassSymbol extends Symbol {
+		public ClassDecl decl;
+
+		public ClassSymbol(String name, ClassDecl decl) {
+			super(name);
+			this.decl = decl;
+		}
+	}
+
+
+	 // ensures that class 'childName' is not among the ancestors of 'parentDecl' to avoid inheritance cycles
+	private void checkInheritanceCycle(String childName, ClassDecl parentDecl) {
+		// if parent's name is exactly child's name then direct cycle
+		if (parentDecl.getName().equals(childName)) {
+			error("Inheritance cycle: " + childName + " cannot inherit from itself.");
+			return;
+		}
+		// if parent's parent is null then no cycle
+		if (parentDecl.getParentName() == null) {
+			return;
+		}
+		// otherwise look up parent's parent
+		Symbol grandSym = currentScope.lookup(parentDecl.getParentName());
+		if (grandSym instanceof ClassSymbol cs) {
+			checkInheritanceCycle(childName, cs.decl);
+		}
+	}
+
 	private boolean isBuiltin(Decl d) {
 		if (d instanceof FunDecl fd) {
 			String name = fd.name;
@@ -193,4 +322,24 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 		}
 		return false;
 	}
+
+
+	// recursively injects fields declared in ancestor classes into the given scope
+	private void injectInheritedFields(Scope scope, ClassDecl cd) {
+		String parentName = cd.getParentName();
+		if (parentName != null) {
+			// lookup the parent class symbol in an outer scope
+			Symbol parentSym = scope.lookup(parentName);
+			if (parentSym instanceof ClassSymbol ps) {
+				ClassDecl parentDecl = ps.decl;
+				// first, recursively inject fields from ancestors of the parent
+				injectInheritedFields(scope, parentDecl);
+				// then, inject the parent’s own fields
+				for (VarDecl field : parentDecl.getFields()) {
+					scope.put(new VariableSymbol(field.name, field));
+				}
+			}
+		}
+	}
+
 }

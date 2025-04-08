@@ -7,12 +7,14 @@ public final class FunDef extends Decl {
     public final List<VarDecl> params;
     public final Block block;
     public int localVarSize;
+    public boolean isInstanceMethod; // flag to indicate instance method
 
     public FunDef(Type type, String name, List<VarDecl> params, Block block) {
         this.type = type;
         this.name = name;
         this.params = params;
         this.block = block;
+        this.isInstanceMethod = false; // default to false, set to true in class declarations
     }
 
     public List<ASTNode> children() {
@@ -22,5 +24,4 @@ public final class FunDef extends Decl {
         children.add(block);
         return children;
     }
-
 }

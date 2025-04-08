@@ -125,6 +125,15 @@ public class Tokeniser extends CompilerPass {
                         return new Token(Token.Category.ELSE, line, column);
                     case "continue":
                         return new Token(Token.Category.CONTINUE, line, column);
+
+                    // NEW KEYWORDS FOR PART V
+                    case "class":
+                        return new Token(Token.Category.CLASS, line, column);
+                    case "extends":
+                        return new Token(Token.Category.EXTENDS, line, column);
+                    case "new":
+                        return new Token(Token.Category.NEW, line, column);
+
                     default:
                         return new Token(Token.Category.IDENTIFIER, ident, line, column);
                 }
@@ -200,7 +209,7 @@ public class Tokeniser extends CompilerPass {
                 }
             }
 
-            //str literals
+            // string literals
             if (c == '"') {
                 StringBuilder sb = new StringBuilder();
                 int startLine = line;
@@ -232,12 +241,11 @@ public class Tokeniser extends CompilerPass {
                     }
                 }
 
-
                 error(c, startLine, startCol);
                 return new Token(Token.Category.INVALID, startLine, startCol);
             }
 
-            // multi-char op (also delimeters)
+            // multi-char op (also delimiters)
             switch (c) {
                 case '+':
                     return new Token(Token.Category.PLUS, line, column);

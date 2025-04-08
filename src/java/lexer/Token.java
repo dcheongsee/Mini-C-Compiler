@@ -46,13 +46,18 @@ public class Token {
         // include
         INCLUDE, // '#include'
 
+        // NEW TOKENS FOR PART V
+        CLASS,   // 'class'
+        EXTENDS, // 'extends'
+        NEW,     // 'new'
+
         // SpecialCharWithoutSingleQuote = One of the following 30 characters: ` ~ @ ! $ # ^ * % & ( ) [ ] { } < > + = _ - | / ; : , . ? "
         // SpecialCharWithoutDoubleQuote = One of the following 30 characters: ` ~ @ ! $ # ^ * % & ( ) [ ] { } < > + = _ - | / ; : , . ? '
         // WhiteSpace                    = ' '
         // EscapedChar                   = '\a' | '\b' | '\n' | '\r' | '\t' | '\\' | '\'' | '\"' | '\0'
         // literals
-        CHAR_LITERAL,   // ''' (LowerCaseAlpha | UpperCaseAlpha | Digit |  SpecialCharWithoutSingleQuote  | WhiteSpace | EscapedChar) '''  any character (except single quote) enclosed within  a pair of single quotes
-        STRING_LITERAL, // '"' (LowerCaseAlpha | UpperCaseAlpha | Digit |  SpecialCharWithoutDoubleQuote  | WhiteSpace | EscapedChar)* '"'  any sequence of characters (except double quote) enclosed within two double quotes
+        CHAR_LITERAL,   // ''' (LowerCaseAlpha | UpperCaseAlpha | Digit |  SpecialCharWithoutSingleQuote  | WhiteSpace | EscapedChar) '''
+        STRING_LITERAL, // '"' (LowerCaseAlpha | UpperCaseAlpha | Digit |  SpecialCharWithoutDoubleQuote  | WhiteSpace | EscapedChar)* '"'
         INT_LITERAL,    // Digit+
 
         // logical operators
@@ -110,5 +115,3 @@ public class Token {
     }
 
 }
-
-

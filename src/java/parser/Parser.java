@@ -124,14 +124,20 @@ public class Parser extends CompilerPass {
         parseIncludes();
         List<Decl> decls = new ArrayList<>();
 
-        while (accept(Category.STRUCT, Category.INT, Category.CHAR, Category.VOID)) {
+        // updated to accept CLASS as well as the original categories
+        while (accept(Category.STRUCT, Category.INT, Category.CHAR, Category.VOID, Category.CLASS)) {
             if (token.category == Category.STRUCT &&
                     lookAhead(1).category == Category.IDENTIFIER &&
                     lookAhead(2).category == Category.LBRA) {
+                // parse struct declaration
                 decls.add(parseStructDecl());
             }
+            else if (token.category == Category.CLASS) {
+                // parse class declaration
+                decls.add(parseClassDecl());
+            }
             else {
-                // store type AST node
+                // parse either a function definition/declaration or a global variable declaration
                 Type type = parseType();
                 Token ident = expect(Category.IDENTIFIER);
                 if (accept(Category.LPAR))
@@ -161,11 +167,59 @@ public class Parser extends CompilerPass {
 
         do {
             fields.add(parseVariableDecl());
-        } while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT));
+        } while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT, Category.CLASS));
         expect(Category.RBRA);
         expect(Category.SC);
 
         return new StructTypeDecl(id.data, fields);
+    }
+
+
+     // parse a class declaration
+    private ClassDecl parseClassDecl() {
+        // we already know token.category == CLASS at this point
+        expect(Category.CLASS);
+        Token className = expect(Category.IDENTIFIER);
+
+        // optional "extends" <IDENT>
+        String parentName = null;
+        if (accept(Category.EXTENDS)) {
+            expect(Category.EXTENDS);
+            Token parentIdent = expect(Category.IDENTIFIER);
+            parentName = parentIdent.data;
+        }
+
+        expect(Category.LBRA);
+
+        // parse zero or more variable declarations
+        List<VarDecl> fields = new ArrayList<>();
+        while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT, Category.CLASS)) {
+            if (lookAhead(2).category == Category.LPAR) {
+                break;
+            }
+            fields.add(parseVariableDecl());
+        }
+
+        // parse zero or more function definitions
+        List<FunDef> methods = new ArrayList<>();
+        while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT, Category.CLASS)) {
+            Type type = parseType();
+            Token ident = expect(Category.IDENTIFIER);
+            expect(Category.LPAR);
+            List<VarDecl> params = parseParameters();
+            expect(Category.RPAR);
+
+            Block block = parseBlock();
+            FunDef method = new FunDef(type, ident.data, params, block);
+            method.isInstanceMethod = true; // mark as instance method
+            methods.add(method);
+        }
+
+        expect(Category.RBRA);
+
+        // no semicolon after '}' for classes in our grammar
+
+        return new ClassDecl(className.data, parentName, fields, methods);
     }
 
     private Decl parseFunction(Type type, Token ident) {
@@ -213,7 +267,7 @@ public class Parser extends CompilerPass {
     }
 
 
-    // allows for 0 or more comma separated args
+    // allows for 0 or more comma separated parameters
     private List<VarDecl> parseParameters() {
         List<VarDecl> params = new ArrayList<>();
         if (!accept(Category.RPAR)) {
@@ -254,7 +308,14 @@ public class Parser extends CompilerPass {
             Token id = expect(Category.IDENTIFIER);
 
             type = new StructType(id.data);
-        } else {
+        }
+        // new branch: handle 'class' in a type
+        else if (accept(Category.CLASS)) {
+            expect(Category.CLASS);
+            Token id = expect(Category.IDENTIFIER);
+            type = new ClassType(id.data);
+        }
+        else {
             // expect one of int, char, void
             Token t = expect(Category.INT, Category.CHAR, Category.VOID);
             switch (t.category) {
@@ -272,6 +333,8 @@ public class Parser extends CompilerPass {
                     break;
             }
         }
+
+        // handle any pointer stars
         while (accept(Category.ASTERISK)) {
             expect(Category.ASTERISK);
             type = new PointerType(type);
@@ -282,10 +345,12 @@ public class Parser extends CompilerPass {
     private Block parseBlock() {
         Block block = new Block(); // vds and stmts initialized in the constructor
         expect(Category.LBRA);
-        while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT)) {
+        // parse variable declarations
+        while (accept(Category.INT, Category.CHAR, Category.VOID, Category.STRUCT, Category.CLASS)) {
             // each var decl returns a VarDecl node which we add to block.vds
             block.vds.add(parseVariableDecl());
         }
+        // parse statements
         while (isStmtStart()) {
             block.stmts.add(parseStmt());
         }
@@ -344,7 +409,6 @@ public class Parser extends CompilerPass {
         return new If(condition, thenStmt, elseStmt);
     }
 
-
     private Stmt parseReturn() {
         expect(Category.RETURN);
         Expr retExpr = null;
@@ -356,9 +420,10 @@ public class Parser extends CompilerPass {
     }
 
     private boolean isExpStart() {
+        // 'new' can also start an expression (instantiating an object)
         return accept(Category.IDENTIFIER, Category.INT_LITERAL, Category.CHAR_LITERAL,
                 Category.STRING_LITERAL, Category.LPAR, Category.PLUS, Category.MINUS,
-                Category.ASTERISK, Category.AND, Category.SIZEOF);
+                Category.ASTERISK, Category.AND, Category.SIZEOF, Category.NEW);
     }
 
     private boolean isStmtStart() {
@@ -441,6 +506,10 @@ public class Parser extends CompilerPass {
     }
 
     private Expr parseUnary() {
+        // handle 'new' at the same precedence level as unary +, -
+        if (accept(Category.NEW)) {
+            return parseNewInstance();
+        }
         if (accept(Category.SIZEOF)) {
             return parseSizeOf();
         } else if (accept(Category.MINUS, Category.PLUS, Category.ASTERISK, Category.AND)) {
@@ -460,11 +529,26 @@ public class Parser extends CompilerPass {
                     return expr;
             }
         } else if (accept(Category.LPAR) && isType(lookAhead(1).category)) {
-            // this branch is for typecasting
+            // typecast
             return parseTypecast();
         } else {
             return parsePrimary();
         }
+    }
+
+
+     // parse an object instantiation "new classtype()"
+    private Expr parseNewInstance() {
+        expect(Category.NEW); // we know it's 'new'
+        // parse class type
+        expect(Category.CLASS);
+        Token id = expect(Category.IDENTIFIER);
+        ClassType ct = new ClassType(id.data);
+
+        expect(Category.LPAR);
+        expect(Category.RPAR);
+
+        return new NewInstance(ct);
     }
 
     private Expr parseTypecast() {
@@ -477,7 +561,11 @@ public class Parser extends CompilerPass {
 
     // is token category a valid type?
     private boolean isType(Category category) {
-        return category == Category.INT || category == Category.CHAR || category == Category.VOID || category == Category.STRUCT;
+        return category == Category.INT
+                || category == Category.CHAR
+                || category == Category.VOID
+                || category == Category.STRUCT
+                || category == Category.CLASS; // Part V: class type
     }
 
     private Expr parsePrimary() {
@@ -511,10 +599,10 @@ public class Parser extends CompilerPass {
             error(Category.IDENTIFIER, Category.INT_LITERAL, Category.CHAR_LITERAL, Category.STRING_LITERAL, Category.LPAR);
         }
 
-        // after parsing any primary, check for field accesses
+        // after parsing any primary, check for repeated . or [
         while (accept(Category.DOT) || accept(Category.LSBR)) {
             if (accept(Category.DOT)) {
-                result = parseFieldAccess(result);
+                result = parseFieldOrInstanceCall(result);
             } else if (accept(Category.LSBR)) {
                 result = parseArrayAccess(result);
             }
@@ -552,7 +640,6 @@ public class Parser extends CompilerPass {
         }
     }
 
-
     private Expr parseFuncall(Token ident) {
         expect(Category.LPAR);
         List<Expr> args = new ArrayList<>();
@@ -565,6 +652,85 @@ public class Parser extends CompilerPass {
         }
         expect(Category.RPAR);
         return new FunCallExpr(ident.data, args);
+    }
+
+    private Expr parseFieldOrInstanceCall(Expr expr) {
+        // we already know there's a DOT
+        expect(Category.DOT);
+        Token fieldToken = expect(Category.IDENTIFIER);
+
+        // if next token is ( then this is an instance function call
+        if (accept(Category.LPAR)) {
+            expect(Category.LPAR);
+            List<Expr> args = new ArrayList<>();
+            if (!accept(Category.RPAR)) {
+                args.add(parseExp());
+                while (accept(Category.COMMA)) {
+                    expect(Category.COMMA);
+                    args.add(parseExp());
+                }
+            }
+            expect(Category.RPAR);
+            Expr instanceCall = new InstanceFunCallExpr(expr, fieldToken.data, args);
+
+            // parse chain of . or [ after instance call if needed
+            while (accept(Category.DOT) || accept(Category.LSBR)) {
+                if (accept(Category.DOT)) {
+                    expect(Category.DOT);
+                    Token nextField = expect(Category.IDENTIFIER);
+                    if (accept(Category.LPAR)) {
+                        // subsequent instance call
+                        expect(Category.LPAR);
+                        List<Expr> nextArgs = new ArrayList<>();
+                        if (!accept(Category.RPAR)) {
+                            nextArgs.add(parseExp());
+                            while (accept(Category.COMMA)) {
+                                expect(Category.COMMA);
+                                nextArgs.add(parseExp());
+                            }
+                        }
+                        expect(Category.RPAR);
+                        instanceCall = new InstanceFunCallExpr(instanceCall, nextField.data, nextArgs);
+                    } else {
+                        instanceCall = new FieldAccessExpr(instanceCall, nextField.data);
+                    }
+                } else if (accept(Category.LSBR)) {
+                    instanceCall = parseArrayAccess(instanceCall);
+                }
+            }
+            return instanceCall;
+        }
+        else {
+            // regular field access
+            Expr fieldExpr = new FieldAccessExpr(expr, fieldToken.data);
+
+            // parse chain of . or [ after field access
+            while (accept(Category.DOT) || accept(Category.LSBR)) {
+                if (accept(Category.DOT)) {
+                    expect(Category.DOT);
+                    Token nextField = expect(Category.IDENTIFIER);
+                    if (accept(Category.LPAR)) {
+                        // subsequent instance call
+                        expect(Category.LPAR);
+                        List<Expr> nextArgs = new ArrayList<>();
+                        if (!accept(Category.RPAR)) {
+                            nextArgs.add(parseExp());
+                            while (accept(Category.COMMA)) {
+                                expect(Category.COMMA);
+                                nextArgs.add(parseExp());
+                            }
+                        }
+                        expect(Category.RPAR);
+                        fieldExpr = new InstanceFunCallExpr(fieldExpr, nextField.data, nextArgs);
+                    } else {
+                        fieldExpr = new FieldAccessExpr(fieldExpr, nextField.data);
+                    }
+                } else if (accept(Category.LSBR)) {
+                    fieldExpr = parseArrayAccess(fieldExpr);
+                }
+            }
+            return fieldExpr;
+        }
     }
 
     private Expr parseArrayAccess(Expr expr) {
@@ -581,22 +747,10 @@ public class Parser extends CompilerPass {
         return result;
     }
 
-    private Expr parseFieldAccess(Expr expr) {
-        expect(Category.DOT);
-        Token fieldToken = expect(Category.IDENTIFIER);
-        Expr result = new FieldAccessExpr(expr, fieldToken.data);
-        while (accept(Category.DOT)) {
-            expect(Category.DOT);
-            Token nextField = expect(Category.IDENTIFIER);
-            result = new FieldAccessExpr(result, nextField.data);
-        }
-        return result;
-    }
-
     private Expr parseSizeOf() {
         expect(Category.SIZEOF);
         expect(Category.LPAR);
-        Type type = parseType();     // Parse the type inside sizeof()
+        Type type = parseType();     // parse the type inside sizeof()
         expect(Category.RPAR);
         return new SizeOfExpr(type);
     }
