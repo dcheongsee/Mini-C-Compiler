@@ -91,6 +91,7 @@ public class MemAllocCodeGen extends CodeGen {
         return offset;
     }
 
+
     // computes max alignment among struct fields
     private int computeStructAlignment(StructTypeDecl decl) {
         int maxAlign = 1;
@@ -106,6 +107,7 @@ public class MemAllocCodeGen extends CodeGen {
         maxAlign = Math.max(4, maxAlign);
         return maxAlign;
     }
+
 
     public void visit(ASTNode n) {
         // for the Program node, process its decls only.
@@ -124,17 +126,6 @@ public class MemAllocCodeGen extends CodeGen {
 
     private void visit(ASTNode n, boolean inStruct) {
         if (n == null) return;
-
-        // handle ClassDecl for object layout
-        if (n instanceof ClassDecl cd) {
-            // compute the object layout for the class
-            computeClassLayout(cd);
-            // process children (if any) but no further layout is needed here
-            for (ASTNode child : n.children()) {
-                visit(child, false);
-            }
-            return;
-        }
 
         if (n instanceof StructTypeDecl std) {
             structDecls.put(std.getName(), std);
@@ -206,36 +197,5 @@ public class MemAllocCodeGen extends CodeGen {
         }
     }
 
-
-    private void computeClassLayout(ClassDecl cd) {
-        int baseOffset = 4; // default: no parent then first field starts at offset 4
-        if (cd.getParentName() != null) {
-            // look up the parent's class declaration in the global AST
-            ClassDecl parent = null;
-            for (Decl d : sem.SemanticAnalyzer.GlobalAST.decls) {
-                if (d instanceof ClassDecl c && c.getName().equals(cd.getParentName())) {
-                    parent = c;
-                    break;
-                }
-            }
-            if (parent != null) {
-                // recursively ensure parent's layout is computed
-                computeClassLayout(parent);
-                baseOffset = parent.objectSize;
-            }
-        }
-        // for each field in this class, assign an offset (4 bytes per field)
-        // note the parser/type analyzer ensures that a subclass does not redeclare a parent's field
-        for (int i = 0; i < cd.getFields().size(); i++) {
-            VarDecl field = cd.getFields().get(i);
-            field.offset = baseOffset + i * 4;
-        }
-        // the total object size is the baseOffset plus 4 bytes for each field declared in this class
-        int totalSize = baseOffset + cd.getFields().size() * 4;
-        cd.objectSize = totalSize;
-        System.out.println("Computed object layout for class " + cd.getName() +
-                ": objectSize = " + totalSize + ", field offsets: " +
-                cd.getFields().stream().map(f -> f.name + "=" + f.offset).toList());
-    }
 
 }

@@ -1,5 +1,6 @@
 package gen;
 
+
 import ast.*;
 import gen.asm.AssemblyProgram;
 import gen.asm.Label;
@@ -26,29 +27,16 @@ public class FunCodeGen extends CodeGen {
         }
 
         // emit function label
-        Label functionLabel = Label.get(fd.labelName);
+        Label functionLabel = Label.get(fd.name);
         asmProg.getCurrentTextSection().emit(functionLabel);
 
         asmProg.getCurrentTextSection().emit(OpCode.ANDI, Register.Arch.sp, Register.Arch.sp, 0xFFFFFFFC);
         asmProg.getCurrentTextSection().emit(new gen.asm.Comment("Align sp to word boundary"));
 
-
-        boolean isInstance = fd.isInstanceMethod;
-
-
-        int prologSize = isInstance ? 12 : 8;
-        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -prologSize);
-        if (isInstance) {
-            // for instance methods, save implicit "this" from $a0 at offset 0
-            // then save $ra at offset 4, and $fp at offset 8
-            asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.a0, Register.Arch.sp, 0); // Save "this"
-            asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.ra, Register.Arch.sp, 4); // Save $ra
-            asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.fp, Register.Arch.sp, 8); // Save old fp
-        } else {
-            // for global functions, save $ra at offset 0 and $fp at offset 4
-            asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.ra, Register.Arch.sp, 0); // Save ra
-            asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.fp, Register.Arch.sp, 4); // Save old fp
-        }
+        // prolog, push $ra onto the stack then set up frame pointer
+        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -8);
+        asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.fp, Register.Arch.sp, 4); // Save old fp
+        asmProg.getCurrentTextSection().emit(OpCode.SW, Register.Arch.ra, Register.Arch.sp, 0); // Save ra
         asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.fp, Register.Arch.sp, Register.Arch.zero);
 
         int localSpace = fd.localVarSize;  // computed by MemAllocCodeGen
@@ -67,23 +55,17 @@ public class FunCodeGen extends CodeGen {
         // emit function body
         scd.visit(fd.block);
 
-        // epilog: emit return label then restore registers and frame pointer
+        // epilog, emit return label then restore $ra
         asmProg.getCurrentTextSection().emit(retLabel);
+
 
         if (alignedLocalSpace > 0) {
             asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, alignedLocalSpace);
         }
 
-        if (isInstance) {
-            // for instance methods, restore registers in reverse order
-            // restore $fp from offset 8, then $ra from offset 4
-            asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.fp, Register.Arch.sp, 8);
-            asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.ra, Register.Arch.sp, 4);
-        } else {
-            asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.fp, Register.Arch.sp, 4);
-            asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.ra, Register.Arch.sp, 0);
-        }
-        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, prologSize);
+        asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.ra, Register.Arch.sp, 0);
+        asmProg.getCurrentTextSection().emit(OpCode.LW, Register.Arch.fp, Register.Arch.sp, 4);
+        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, 8);
 
         if (fd.name.equals("main")) {
             // exit sequence for main
@@ -224,4 +206,7 @@ public class FunCodeGen extends CodeGen {
         System.out.println("No matching return variable found for function '" + fd.name + "'.");
         return null;
     }
+
+
+
 }

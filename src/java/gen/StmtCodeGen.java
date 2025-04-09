@@ -71,9 +71,6 @@ public class StmtCodeGen extends CodeGen {
                 asmProg.getCurrentTextSection().emit(OpCode.J, continueStack.peek());
             }
             case Return r -> {
-                // for both instance and global functions, handle the return expression
-                // note For instance methods, any adjustments regarding the implicit "this" pointer
-                // and dynamic dispatch were handled in FunCodeGen and ExprValCodeGen
                 if (r.expr != null) {
                     if (r.expr.type instanceof StructType) {
                         // for struct returns, evaluate expression to get its address
@@ -208,4 +205,5 @@ public class StmtCodeGen extends CodeGen {
             asmProg.getCurrentTextSection().emit(OpCode.SB, temp, dest, i);
         }
     }
+
 }

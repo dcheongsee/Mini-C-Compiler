@@ -49,20 +49,26 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 			case FunDef fd -> {
 				Symbol existingSym = currentScope.lookupCurrent(fd.name);
 				if (existingSym == null) {
+					// no function with that name exists yet, add it
 					currentScope.put(new FunctionSymbol(fd.name, fd));
 				} else if (existingSym instanceof FunctionSymbol fs) {
-					// instead of erroring out when a definition is already present,
-					// update the symbol to point to this FunDef
-					fs.decl = fd;
+					// if the existing symbol already has a definition (FunDef), that's a duplicate
+					if (fs.decl instanceof FunDef) {
+						error("Function definition " + fd.name + " is already defined in this scope.");
+					} else {
+						// otherwise, it was only declared (FunDecl) earlier. Now update the symbol
+						// to the definition
+						fs.decl = fd;
+					}
 				} else {
 					error("Identifier " + fd.name + " does not refer to a function.");
 				}
 
-				// create a new scope for the method's body
+				// create a new scope for the function's body
 				Scope prev = currentScope;
 				currentScope = new Scope(prev);
 
-				// for instance methods, inject the enclosing class’s fields (including inherited ones) into the method scope
+				// for instance methods, inject the enclosing class's fields
 				if (fd.isInstanceMethod && !classStack.isEmpty()) {
 					ClassDecl enclosing = classStack.peek();
 					// inject inherited fields from all ancestors
@@ -73,12 +79,11 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 					}
 				}
 
-
-				// process the parameters
+				// process parameters
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
-				// process the method body
+				// process the function body
 				visit(fd.block);
 				currentScope = prev;
 			}
