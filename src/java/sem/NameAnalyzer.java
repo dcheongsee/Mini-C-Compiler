@@ -193,6 +193,7 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 					if (currentScope.lookupCurrent(field.name) != null) {
 						error("Field " + field.name + " is already declared in class " + cd.getName());
 					} else {
+						field.isInstanceField = true; // mark as instance field
 						currentScope.put(new VariableSymbol(field.name, field));
 					}
 				}

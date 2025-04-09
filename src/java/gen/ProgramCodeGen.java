@@ -30,8 +30,13 @@ public class ProgramCodeGen extends CodeGen {
 
         // collect all class declarations for vtable generation
         for (Decl d : p.decls) {
-            if (d instanceof ClassDecl cd) {
+            if (d instanceof FunDef fd) {
+                fd.labelName = fd.name;  // global function eg main
+            } else if (d instanceof ClassDecl cd) {
                 classDecls.put(cd.getName(), cd);
+                for (FunDef method : cd.getMethods()) {
+                    method.labelName = cd.getName() + "_" + method.name;
+                }
             }
         }
 
@@ -42,15 +47,17 @@ public class ProgramCodeGen extends CodeGen {
         }
 
         // generate the code for each function
-        p.decls.forEach((d) -> {
-            switch(d) {
-                case FunDef fd -> {
-                    FunCodeGen fcg = new FunCodeGen(asmProg);
-                    fcg.visit(fd);
+        for (Decl d : p.decls) {
+            if (d instanceof FunDef fd) {
+                new FunCodeGen(asmProg).visit(fd);
+            } else if (d instanceof ClassDecl cd) {
+                // for each method in the class, generate its code
+                for (FunDef method : cd.getMethods()) {
+                    new FunCodeGen(asmProg).visit(method);
                 }
-                default -> {}// nothing to do
             }
-        });
+        }
+
     }
 
 
@@ -69,8 +76,8 @@ public class ProgramCodeGen extends CodeGen {
 
         // add or override methods declared in this class
         for (FunDef method : cd.getMethods()) {
-            Label methodLabel = Label.get(method.name);
-            vtable.put(method.name, methodLabel);
+            Label methodLabel = Label.get(method.labelName);  // use unique label
+            vtable.put(method.name, methodLabel);  // key is method name, value is unique label
         }
 
         return new ArrayList<>(vtable.values());

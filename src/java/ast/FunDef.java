@@ -8,6 +8,7 @@ public final class FunDef extends Decl {
     public final Block block;
     public int localVarSize;
     public boolean isInstanceMethod; // flag to indicate instance method
+    public String labelName;
 
     public FunDef(Type type, String name, List<VarDecl> params, Block block) {
         this.type = type;

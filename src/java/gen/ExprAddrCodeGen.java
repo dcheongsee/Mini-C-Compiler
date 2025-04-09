@@ -16,11 +16,13 @@ public class ExprAddrCodeGen extends CodeGen {
 
     private final Map<String, StructTypeDecl> structDecls;
     private final ASTNode astRoot;
+    private final Map<String, ClassDecl> classDecls;
 
     public ExprAddrCodeGen(AssemblyProgram asmProg, ASTNode astRoot) {
         this.asmProg = asmProg;
         this.astRoot = astRoot;
         this.structDecls = collectStructDecls(astRoot);
+        this.classDecls = collectClassDecls(astRoot);
     }
 
     private Map<String, StructTypeDecl> collectStructDecls(ASTNode node) {
@@ -47,32 +49,35 @@ public class ExprAddrCodeGen extends CodeGen {
 
             // VarExpr, either global or local
             case VarExpr v -> {
-                VarDecl vd = v.vd;  // NameAnalyzer should have set this
-                if (vd == null) {
-                    throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
-                }
-                Register addrReg = Register.Virtual.create();
-                System.out.println("isParameter: " + vd.isParameter);
-                System.out.println("isArrayParam: " + vd.isArrayParam);
-                if (vd.globalLabel != null) {
-                    asmProg.getCurrentTextSection().emit(OpCode.LA, addrReg, Label.get(vd.globalLabel));
-                } else if (vd.isParameter) {
-                    // use different behavior for array params vs pointer params
-                    if (vd.isArrayParam) {
-                        // for params declared as arrays (which decay to pointers)
-                        // load pointer value from parameter slot
-                        asmProg.getCurrentTextSection().emit(OpCode.LW, addrReg, Register.Arch.fp, vd.offset);
-                    } else {
-                        // for pointer (and scalar) params the caller already stored the pointer value
-                        // so compute address using ADDIU
-                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addrReg, Register.Arch.fp, vd.offset);
-                    }
+                VarDecl vd = v.vd;
+                if (vd.isInstanceField) {
+                    // address of instance field
+                    Register thisPtr = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, thisPtr, Register.Arch.fp, 0); // load "this"
+                    Register finalAddr = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, thisPtr, vd.offset);
+                    yield finalAddr;
                 } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, addrReg, Register.Arch.fp, vd.offset);
+                    // address of local variable or parameter
+                    Register finalAddr = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, Register.Arch.fp, vd.offset);
+                    yield finalAddr;
                 }
-                System.out.println("ExprAddrCodeGen: VarExpr '" + v.name +
-                        "' at computed address (fp+offset): " + vd.offset);
-                yield addrReg;
+            }
+
+            case FieldAccessExpr fa -> {
+                Register baseAddr;
+                if (fa.expr.type instanceof ClassType) {
+                    baseAddr = new ExprValCodeGen(asmProg, astRoot).visit(fa.expr); // get pointer to object
+                } else if (fa.expr.type instanceof StructType) {
+                    baseAddr = visit(fa.expr); // get address of struct
+                } else {
+                    throw new RuntimeException("Field access on non-struct and non-class type");
+                }
+                int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                Register finalAddr = Register.Virtual.create();
+                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, baseAddr, fieldOffset);
+                yield finalAddr;
             }
 
             // ArrayAccess, base address + (index * elemSize)
@@ -96,38 +101,6 @@ public class ExprAddrCodeGen extends CodeGen {
                 yield finalAddr;
             }
 
-            // FieldAccess, address = base address + field offset
-            case FieldAccessExpr fa -> {
-                Register baseAddr = visit(fa.expr);
-                int fieldOffset;
-                if (fa.expr.type instanceof StructType) {
-                    fieldOffset = getFieldOffset(fa.expr.type, fa.field);
-                } else if (fa.expr.type instanceof ClassType ct) {
-                    ClassDecl cd = lookupClassDecl(ct.getName());
-                    if (cd == null) {
-                        throw new RuntimeException("Class " + ct.getName() + " not found");
-                    }
-                    boolean found = false;
-                    fieldOffset = 0;
-                    for (VarDecl fld : cd.getFields()) {
-                        if (fld.name.equals(fa.field)) {
-                            fieldOffset = fld.offset;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        throw new RuntimeException("Field " + fa.field + " not found in class " + ct.getName());
-                    }
-                } else {
-                    throw new RuntimeException("Field access on non-struct and non-class type");
-                }
-                Register finalAddr = Register.Virtual.create();
-                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, finalAddr, baseAddr, fieldOffset);
-                System.out.println("ExprAddrCodeGen: FieldAccessExpr on field '" + fa.field +
-                        "' with base address: " + baseAddr + " and offset: " + fieldOffset);
-                yield finalAddr;
-            }
 
             // ValueAt, address is the pointer's value
             case ValueAtExpr va -> {
@@ -238,29 +211,53 @@ public class ExprAddrCodeGen extends CodeGen {
         return ((value + alignment - 1) / alignment) * alignment;
     }
 
-    private int getFieldOffset(Type structType, String fieldName) {
-        if (!(structType instanceof StructType st)) {
-            throw new RuntimeException("Field access on non-struct type");
-        }
-        StructTypeDecl decl = structDecls.get(st.name);
-        if (decl == null) {
-            throw new RuntimeException("Struct " + st.name + " not found");
-        }
-        int offset = 0;
-        int maxAlign = 1;
-        for (Decl d : decl.getFields()) {
-            if (d instanceof VarDecl vd) {
-                int size = getSize(vd.type);
-                int align = getAlignment(vd.type);
-                offset = alignTo(offset, align);
-                if (vd.name.equals(fieldName)) {
-                    return offset;
+    private int getFieldOffset(Type type, String fieldName) {
+        if (type instanceof StructType st) {
+            StructTypeDecl decl = structDecls.get(st.name);
+            if (decl == null) {
+                throw new RuntimeException("Struct " + st.name + " not found");
+            }
+            int offset = 0;
+            for (Decl d : decl.getFields()) {
+                if (d instanceof VarDecl vd) {
+                    int size = getSize(vd.type);
+                    int align = getAlignment(vd.type);
+                    offset = alignTo(offset, align);
+                    if (vd.name.equals(fieldName)) {
+                        return offset;
+                    }
+                    offset += size;
                 }
-                offset += size;
-                if (align > maxAlign) maxAlign = align;
+            }
+            throw new RuntimeException("Field " + fieldName + " not found in struct " + st.name);
+        } else if (type instanceof ClassType ct) {
+            ClassDecl decl = classDecls.get(ct.getName());
+            if (decl == null) {
+                throw new RuntimeException("Class " + ct.getName() + " not found");
+            }
+            VarDecl fieldDecl = findFieldInClass(decl, fieldName);
+            if (fieldDecl == null) {
+                throw new RuntimeException("Field " + fieldName + " not found in class " + ct.getName());
+            }
+            return fieldDecl.offset; // offset computed in MemAllocCodeGen
+        } else {
+            throw new RuntimeException("Field access on non-struct and non-class type");
+        }
+    }
+
+    private VarDecl findFieldInClass(ClassDecl cd, String fieldName) {
+        for (VarDecl field : cd.getFields()) {
+            if (field.name.equals(fieldName)) {
+                return field;
             }
         }
-        throw new RuntimeException("Field " + fieldName + " not found in struct " + st.name);
+        if (cd.getParentName() != null) {
+            ClassDecl parent = classDecls.get(cd.getParentName());
+            if (parent != null) {
+                return findFieldInClass(parent, fieldName);
+            }
+        }
+        return null;
     }
 
     // lookup class declaration in the global AST
@@ -271,5 +268,17 @@ public class ExprAddrCodeGen extends CodeGen {
             }
         }
         return null;
+    }
+
+    private Map<String, ClassDecl> collectClassDecls(ASTNode node) {
+        Map<String, ClassDecl> map = new HashMap<>();
+        if (node instanceof Program p) {
+            for (Decl d : p.decls) {
+                if (d instanceof ClassDecl cd) {
+                    map.put(cd.getName(), cd);
+                }
+            }
+        }
+        return map;
     }
 }

@@ -26,7 +26,7 @@ public class FunCodeGen extends CodeGen {
         }
 
         // emit function label
-        Label functionLabel = Label.get(fd.name);
+        Label functionLabel = Label.get(fd.labelName);
         asmProg.getCurrentTextSection().emit(functionLabel);
 
         asmProg.getCurrentTextSection().emit(OpCode.ANDI, Register.Arch.sp, Register.Arch.sp, 0xFFFFFFFC);

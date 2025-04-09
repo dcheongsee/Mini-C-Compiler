@@ -55,19 +55,44 @@ public class ExprValCodeGen extends CodeGen {
             // VarExpr, get address from addrGen, load LB/LW
             case VarExpr v -> {
                 VarDecl vd = v.vd;
-                if (vd == null) {
-                    throw new RuntimeException("VarExpr has no VarDecl linked: " + v.name);
-                }
-
-                if (vd.type instanceof ArrayType || vd.type instanceof StructType || (vd.isParameter && vd.isArrayParam)) {
-                    yield addrGen.visit(v);
-                }
-                Register addr = addrGen.visit(v);
-                Register result = Register.Virtual.create();
-                if (isCharType(vd.type)) {
-                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, addr, 0);
+                if (vd.isInstanceField) {
+                    // access instance field via "this"
+                    Register thisPtr = Register.Virtual.create();
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, thisPtr, Register.Arch.fp, 0); // load "this" from $fp+0
+                    Register result = Register.Virtual.create();
+                    if (isCharType(vd.type)) {
+                        asmProg.getCurrentTextSection().emit(OpCode.LB, result, thisPtr, vd.offset); // load byte for char
+                    } else {
+                        asmProg.getCurrentTextSection().emit(OpCode.LW, result, thisPtr, vd.offset); // load word for others
+                    }
+                    yield result;
                 } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, addr, 0);
+                    // access local variable or parameter from stack frame
+                    Register result = Register.Virtual.create();
+                    if (isCharType(vd.type)) {
+                        asmProg.getCurrentTextSection().emit(OpCode.LB, result, Register.Arch.fp, vd.offset);
+                    } else {
+                        asmProg.getCurrentTextSection().emit(OpCode.LW, result, Register.Arch.fp, vd.offset);
+                    }
+                    yield result;
+                }
+            }
+
+            case FieldAccessExpr fa -> {
+                Register baseAddr;
+                if (fa.expr.type instanceof ClassType) {
+                    baseAddr = new ExprValCodeGen(asmProg, astRoot).visit(fa.expr); // get pointer
+                } else if (fa.expr.type instanceof StructType) {
+                    baseAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(fa.expr); // get address
+                } else {
+                    throw new RuntimeException("Field access on non-struct and non-class type");
+                }
+                int fieldOffset = getFieldOffset(fa.expr.type, fa.field);
+                Register result = Register.Virtual.create();
+                if (isCharType(fa.type)) {
+                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, baseAddr, fieldOffset);
+                } else {
+                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, baseAddr, fieldOffset);
                 }
                 yield result;
             }
@@ -128,62 +153,6 @@ public class ExprValCodeGen extends CodeGen {
                 yield result;
             }
 
-            // FieldAccess, address, load
-            case FieldAccessExpr fa -> {
-                Register baseAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(fa.expr);
-                VarDecl fieldDecl;
-                int fieldOffset;
-                Type fieldType;
-                if (fa.expr.type instanceof StructType st) {
-                    fieldDecl = findFieldDecl(fa.expr.type, fa.field);
-                    fieldOffset = getFieldOffset(fa.expr.type, fa.field);
-                    fieldType = fieldDecl.type;
-                } else if (fa.expr.type instanceof ClassType ct) {
-                    ClassDecl cd = lookupClassDecl(ct.getName());
-                    if (cd == null) {
-                        throw new RuntimeException("Class " + ct.getName() + " not found");
-                    }
-                    fieldDecl = null;
-                    for (VarDecl fld : cd.getFields()) {
-                        if (fld.name.equals(fa.field)) {
-                            fieldDecl = fld;
-                            break;
-                        }
-                    }
-                    if (fieldDecl == null) {
-                        throw new RuntimeException("Field " + fa.field + " not found in class " + ct.getName());
-                    }
-                    fieldOffset = fieldDecl.offset;
-                    fieldType = fieldDecl.type;
-                } else {
-                    throw new RuntimeException("Field access on non-struct and non-class type");
-                }
-
-                // if field is an array, perform decay conversion
-                if (fieldType instanceof ArrayType) {
-                    Register arrayPtr = Register.Virtual.create();
-                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, arrayPtr, baseAddr, fieldOffset);
-                    fa.type = new PointerType(((ArrayType) fieldType).elementType);
-                    yield arrayPtr;
-                }
-
-                // if field is a struct, return its address
-                if (fieldType instanceof StructType) {
-                    Register fieldAddr = Register.Virtual.create();
-                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, fieldAddr, baseAddr, fieldOffset);
-                    yield fieldAddr;
-                }
-
-                // otherwise for scalar types load value
-                Register result = Register.Virtual.create();
-                if (isCharType(fieldType)) {
-                    asmProg.getCurrentTextSection().emit(OpCode.LB, result, baseAddr, fieldOffset);
-                } else {
-                    asmProg.getCurrentTextSection().emit(OpCode.LW, result, baseAddr, fieldOffset);
-                }
-                fa.type = fieldType;
-                yield result;
-            }
 
             // ValueAt, *pointer, get pointer value then LB/LW from that pointer
             case ValueAtExpr va -> {
@@ -471,40 +440,48 @@ public class ExprValCodeGen extends CodeGen {
                 yield objAddr;
             }
 
-            // instance function call, dynamic dispatch for object method calls
             case InstanceFunCallExpr ifce -> {
                 // evaluate the object expression to obtain the object pointer
                 Register objReg = new ExprValCodeGen(asmProg, astRoot).visit(ifce.object);
 
-                // evaluate explicit arguments and push them in reverse order
+                // set "this" pointer in $a0 (first argument register)
+                asmProg.getCurrentTextSection().emit(OpCode.ADD, Register.Arch.a0, objReg, Register.Arch.zero);
+
+                // evaluate explicit arguments and pass in $a1, $a2, $a3, or stack
+                int argRegIndex = 1; // start at $a1 since $a0 is "this"
                 int totalArgSize = 0;
-                for (int i = ifce.args.size() - 1; i >= 0; i--) {
+                for (int i = 0; i < ifce.args.size(); i++) {
                     Expr argExpr = ifce.args.get(i);
                     Type argType = argExpr.type;
                     if (argType instanceof StructType) {
-                        int structSize = getSize(argType);
+                        // structs are passed by reference
                         Register structAddr = new ExprAddrCodeGen(asmProg, astRoot).visit(argExpr);
-                        for (int off = structSize - 4; off >= 0; off -= 4) {
-                            Register temp = Register.Virtual.create();
-                            asmProg.getCurrentTextSection().emit(OpCode.LW, temp, structAddr, off);
+                        if (argRegIndex < 4) {
+                            Register argReg = getArgRegister(argRegIndex);
+                            asmProg.getCurrentTextSection().emit(OpCode.ADD, argReg, structAddr, Register.Arch.zero);
+                            argRegIndex++;
+                        } else {
+                            // push onto stack if beyond $a3
                             asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
-                            asmProg.getCurrentTextSection().emit(OpCode.SW, temp, Register.Arch.sp, 0);
+                            asmProg.getCurrentTextSection().emit(OpCode.SW, structAddr, Register.Arch.sp, 0);
                             totalArgSize += 4;
                         }
                     } else {
                         Register argVal = new ExprValCodeGen(asmProg, astRoot).visit(argExpr);
-                        asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
-                        asmProg.getCurrentTextSection().emit(OpCode.SW, argVal, Register.Arch.sp, 0);
-                        totalArgSize += 4;
+                        if (argRegIndex < 4) {
+                            Register argReg = getArgRegister(argRegIndex);
+                            asmProg.getCurrentTextSection().emit(OpCode.ADD, argReg, argVal, Register.Arch.zero);
+                            argRegIndex++;
+                        } else {
+                            // push onto stack if beyond $a3
+                            asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
+                            asmProg.getCurrentTextSection().emit(OpCode.SW, argVal, Register.Arch.sp, 0);
+                            totalArgSize += 4;
+                        }
                     }
                 }
 
-                // push the implicit "this" pointer
-                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, -4);
-                asmProg.getCurrentTextSection().emit(OpCode.SW, objReg, Register.Arch.sp, 0);
-                totalArgSize += 4;
-
-                // load the vtable pointer from the object (assumed to be stored at offset 0)
+                // load the vtable pointer from the object (offset 0)
                 Register vtablePtr = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.LW, vtablePtr, objReg, 0);
                 // compute the method offset in the vtable
@@ -512,8 +489,12 @@ public class ExprValCodeGen extends CodeGen {
                 // load the method address from the vtable
                 Register methodAddr = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.LW, methodAddr, vtablePtr, offset);
+                // call the method
                 asmProg.getCurrentTextSection().emit(OpCode.JALR, methodAddr);
-                asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, totalArgSize);
+                // clean up stack if arguments were pushed
+                if (totalArgSize > 0) {
+                    asmProg.getCurrentTextSection().emit(OpCode.ADDIU, Register.Arch.sp, Register.Arch.sp, totalArgSize);
+                }
                 Register result = Register.Virtual.create();
                 asmProg.getCurrentTextSection().emit(OpCode.ADD, result, Register.Arch.v0, Register.Arch.zero);
                 yield result;
@@ -866,5 +847,13 @@ public class ExprValCodeGen extends CodeGen {
                 methods.add(fd);
             }
         }
+    }
+    private Register getArgRegister(int index) {
+        return switch (index) {
+            case 1 -> Register.Arch.a1;
+            case 2 -> Register.Arch.a2;
+            case 3 -> Register.Arch.a3;
+            default -> throw new IllegalArgumentException("Invalid argument register index: " + index);
+        };
     }
 }

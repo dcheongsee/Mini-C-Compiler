@@ -9,10 +9,11 @@ public final class VarDecl extends Decl {
     public String globalLabel; // for global variables
     public Boolean isParameter = false;
     public Boolean isArrayParam = false;
+    public boolean isInstanceField = false; // new field to indicate if this is a class instance field
 
     public VarDecl(Type type, String name) {
-	    this.type = type;
-	    this.name = name;
+        this.type = type;
+        this.name = name;
     }
 
     public List<ASTNode> children() {
@@ -20,5 +21,4 @@ public final class VarDecl extends Decl {
         children.add(type);
         return children;
     }
-
 }
