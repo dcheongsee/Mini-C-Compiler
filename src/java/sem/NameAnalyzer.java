@@ -49,37 +49,38 @@ public class NameAnalyzer extends BaseSemanticAnalyzer {
 			case FunDef fd -> {
 				Symbol existingSym = currentScope.lookupCurrent(fd.name);
 				if (existingSym == null) {
-					// no function with that name exists yet, add it
 					currentScope.put(new FunctionSymbol(fd.name, fd));
 				} else if (existingSym instanceof FunctionSymbol fs) {
-					// if the existing symbol already has a definition (FunDef), that's a duplicate
-					if (fs.decl instanceof FunDef) {
-						error("Function definition " + fd.name + " is already defined in this scope.");
-					} else {
-						// otherwise, it was only declared (FunDecl) earlier. Now update the symbol
-						// to the definition
+					// if we are in a class context, then the symbol was already inserted in the
+					// class declaration phase. In that case, simply update the symbol with the current definition.
+					// Otherwise (global context), a duplicate definition is not allowed
+					if (!classStack.isEmpty()) {
 						fs.decl = fd;
+					} else {
+						if (fs.decl instanceof FunDef) {
+							error("Function definition " + fd.name + " is already defined in this scope.");
+						} else {
+							fs.decl = fd;
+						}
 					}
 				} else {
 					error("Identifier " + fd.name + " does not refer to a function.");
 				}
 
-				// create a new scope for the function's body
+				// create a new scope for the function/method body
 				Scope prev = currentScope;
 				currentScope = new Scope(prev);
 
-				// for instance methods, inject the enclosing class's fields
+				// for instance methods, inject the enclosing class’s fields into the method scope
 				if (fd.isInstanceMethod && !classStack.isEmpty()) {
 					ClassDecl enclosing = classStack.peek();
-					// inject inherited fields from all ancestors
 					injectInheritedFields(currentScope, enclosing);
-					// inject fields declared in the current (enclosing) class
 					for (VarDecl field : enclosing.getFields()) {
 						currentScope.put(new VariableSymbol(field.name, field));
 					}
 				}
 
-				// process parameters
+				// process the parameters
 				for (VarDecl param : fd.params) {
 					visit(param);
 				}
