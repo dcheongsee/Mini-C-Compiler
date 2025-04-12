@@ -1,2 +1,0 @@
-Program(FunDef(INT,main,Block(VarDecl(PointerType(CHAR),s),ExprStmt(Assign(VarExpr(s),StrLiteral(This is a test sentence:
-	It contains a newline, a tab, a double quote ("), and a backslash (\).))),Return(IntLiteral(0)))))

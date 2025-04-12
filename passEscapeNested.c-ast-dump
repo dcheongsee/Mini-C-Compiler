@@ -1,3 +1,0 @@
-Program(FunDef(INT,main,Block(VarDecl(CHAR,a),ExprStmt(Assign(VarExpr(a),BinOp(BinOp(BinOp(BinOp(ChrLiteral(
-),ADD,ChrLiteral(	)),MUL,ChrLiteral(
-)),SUB,BinOp(ChrLiteral(\),SUB,ChrLiteral('))),ADD,ChrLiteral(")))),Return(VarExpr(a)))))
