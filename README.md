@@ -12,49 +12,19 @@ This repo shows the **entire** journey — scanner, LL(k) parser, AST, static-se
 
 ## Pipeline at a glance
 
-<table style="border-collapse:collapse;width:100%">
-  <thead>
-    <tr>
-      <th style="text-align:left;padding:4px 0;border-bottom:2px solid #666;">Stage</th>
-      <th style="text-align:left;padding:4px 0;border-bottom:2px solid #666;">Key ideas</th>
-      <th style="text-align:left;padding:4px 0;border-bottom:2px solid #666;">Files / Packages</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><strong>1 · <a href="description/part1/">Parsing</a></strong></td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;">Recursive-descent LL(k) parser; hand-rolled lexer; comment & escape handling</td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><code>src/lexer/</code>, <code>src/parser/</code>, <code>grammar/syntax_grammar.txt</code></td>
-    </tr>
-    <tr>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><strong>2 · <a href="description/part2/">AST + Semantics</a></strong></td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;">AST built on-the-fly; name analysis with lexical scopes; rule-driven type checker; l-value & control-flow checks</td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><code>src/ast/</code>, <code>src/sem/</code></td>
-    </tr>
-    <tr>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><strong>3 · <a href="description/part3">Code Gen</a></strong></td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;">Virtual-register MIPS32; structs, arrays, pointer arithmetic; short-circuit logic; std-lib via syscalls</td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><code>src/gen/</code>, <code>gen/asm/</code></td>
-    </tr>
-    <tr>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><strong>4 · <a href="description/part4">Reg Alloc</a></strong></td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;">CFG → liveness → interference graph → Chaitin colouring; deterministic spill heuristic (&lt; 5 % mem-access delta)</td>
-      <td style="padding:4px 0;border-bottom:1px solid #ddd;"><code>src/regalloc/GraphColouringRegAlloc.java</code></td>
-    </tr>
-    <tr>
-      <td style="padding:4px 0;">**5 · Runtime**</td>
-      <td style="padding:4px 0;">Thin libc (<code>print_i</code>, <code>read_c</code>, <code>mcmalloc</code>, …); ≈ 60 regression tests</td>
-      <td style="padding:4px 0;"><code>tests/</code>, <code>minic-stdlib.h</code></td>
-    </tr>
-  </tbody>
-</table>
+| Stage                                         | Key ideas                                                                                                                                                                | Files / Packages |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| **1 · [Parsing](description/part1/)**         | Recursive-descent over an LL(k) grammar; hand-rolled lexer; comments & escape-sequence handling                                                                          | `src/lexer/`, `src/parser/`, `grammar/syntax_grammar.txt` |
+| **2 · [AST + Semantics](description/part2/)** | Structural AST (`ast.*`) built on the fly; name analysis with lexical scopes; type checker driven by formal rules in `rules.tex`; l-value & control-flow legality checks | `src/ast/`, `src/sem/` |
+| **3 · [Code Gen](description/part3)**         | Emits virtual-register MIPS32; handles structs, arrays, pointer arithmetic, short-circuit Boolean logic; standard library in syscalls                                    | `src/gen/`, `gen/asm/` |
+| **4 · [Reg Alloc](description/part4)**        | CFG → liveness → interference graph → Chaitin colouring; deterministic spill heuristic (< 5 % mem-access delta vs. gold standard)                                        | `src/regalloc/GraphColouringRegAlloc.java` |
+| **5 · Runtime**                               | Thin libc (`print_i`, `read_c`, `mcmalloc`, …) plus ≈ 60 regression tests                                                                                                | `tests/`, `minic-stdlib.h` |
 
 ### Frontend
 ![Frontend](/figures/frontend.png "Frontend Diagram")
 
 ### Backend
 ![Backend](/figures/backend.png "Backend Diagram")
-
 
 
 
